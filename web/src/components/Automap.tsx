@@ -2,6 +2,9 @@ import { useMemo, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { CardHead, Empty, Icon, SegText, terrainIcon } from './ui.tsx';
+import { GridMap } from './GridMap.tsx';
+import { parseAsciiMap } from '../lib/asciiMap.ts';
+import { plain } from '../lib/ansi.ts';
 
 const R = 3;           // grid radius in rooms
 const CELL = 40;       // px per grid step
@@ -15,6 +18,7 @@ const loadMode = (): Mode => { try { return localStorage.getItem(MODE_KEY) === '
 export function Automap() {
   const { room, mapVersion, asciiMap, loggedIn } = useGame();
   const [mode, setMode] = useState<Mode>(loadMode);
+  const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
   const choose = (m: Mode) => { setMode(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ } };
   const map = game.mapper;
   const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion]);
@@ -63,6 +67,8 @@ export function Automap() {
                 {asciiMap.map((l, i) => <div key={i} className="min-h-[1lh]"><SegText segs={l} /></div>)}
               </pre>
             )
+          ) : hasGrid ? (
+            <GridMap />
           ) : !layout || layout.nodes.length === 0 ? (
             <Empty>The map fills in as you walk. Rooms are remembered in this browser.</Empty>
           ) : (
