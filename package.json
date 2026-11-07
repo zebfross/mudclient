@@ -8,7 +8,7 @@
     "build": "vite build",
     "start": "npm run build && NODE_ENV=production node server/relay.ts",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --no-warnings test/ansi.test.ts && node --no-warnings test/store.test.ts && node --no-warnings test/objectives.test.ts && node --no-warnings test/replay.test.ts && node --no-warnings test/asciiMap.test.ts && node --no-warnings test/lasertag.test.ts"
+    "test": "node --no-warnings test/ansi.test.ts && node --no-warnings test/store.test.ts && node --no-warnings test/objectives.test.ts && node --no-warnings test/replay.test.ts && node --no-warnings test/asciiMap.test.ts && node --no-warnings test/lasertag.test.ts && node --no-warnings test/inventory.test.ts"
   },
   "dependencies": {
     "react": "^19.3.1",

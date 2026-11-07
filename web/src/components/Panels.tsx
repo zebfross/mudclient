@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { game, useGame, type InvItem } from '../lib/store.ts';
+import { CATEGORIES, categoryOf, type Category } from '../lib/inventory.ts';
 import { stripAard } from '../lib/aardColor.ts';
 import { Bar, CardHead, Empty, Icon, SegText, fillCommand } from './ui.tsx';
 
@@ -43,41 +44,62 @@ const TYPE_INFO: Record<number, [string, string, string?]> = {
 };
 const FLAG_NAMES: Record<string, string> = { K: 'Kept', I: 'Invis', M: 'Magic', G: 'Glow', H: 'Hum', C: 'Cursed', E: 'Venom', T: 'Tempered', W: 'Weak' };
 
+const CAT_KEY = 'gaslamp.satchelTab';
+
 export function Satchel({ bare = false }: { bare?: boolean }) {
-  const { inventory, inventoryAt, loggedIn } = useGame();
-  const [open, setOpen] = useState<InvItem | null>(null);
+  const { inventory, inventoryAt, equipment, loggedIn } = useGame();
+  const [open, setOpen] = useState<{ item: InvItem; worn: boolean } | null>(null);
+  const [cat, setCat] = useState<Category>(() => { try { return (localStorage.getItem(CAT_KEY) as Category) || 'all'; } catch { return 'all'; } });
+  const choose = (c: Category) => { setCat(c); try { localStorage.setItem(CAT_KEY, c); } catch { /* ignore */ } };
+
   const carried = inventory.filter((i) => i.wearLoc === -1);
+  const count = (c: Category) => (c === 'all' ? carried.length : c === 'equipped' ? equipment.length : carried.filter((i) => categoryOf(i.type) === c).length);
+  const tabs = CATEGORIES.filter((c) => c.id === 'all' || c.id === 'equipped' || count(c.id) > 0);
+  const active = tabs.some((t) => t.id === cat) ? cat : 'all';
+  const items = active === 'equipped' ? equipment : active === 'all' ? carried : carried.filter((i) => categoryOf(i.type) === active);
+  const label = CATEGORIES.find((c) => c.id === active)!.label;
+
   return (
     <section className={`@container flex flex-col gap-3 ${bare ? '' : 'card p-4 sm:p-5'}`}>
       <CardHead icon="work" iconClass="text-outline" title="Satchel"
-        right={<span className="font-mono text-[10px] text-on-surface-variant">{carried.length} ITEMS</span>} />
-      {carried.length === 0 ? (
-        <Empty>{loggedIn ? (inventoryAt ? 'You carry nothing.' : 'Reading your inventory…') : 'Log in to see your inventory.'}</Empty>
+        right={<span className="font-mono text-[10px] text-on-surface-variant">{carried.length} carried · {equipment.length} worn</span>} />
+      <div role="tablist" aria-label="Inventory categories" className="flex gap-1.5 flex-wrap">
+        {tabs.map((t) => (
+          <button key={t.id} role="tab" aria-selected={active === t.id} aria-label={t.label} title={t.label} onClick={() => choose(t.id)}
+            className={`flex items-center gap-1 rounded-full border px-2.5 py-1 transition-colors ${
+              active === t.id ? 'bg-primary/20 text-primary border-primary/40' : 'text-outline border-surface-high/40 hover:text-on-surface'}`}>
+            <Icon name={t.icon} className="text-base" />
+            <span className="font-mono text-[10px] tabular-nums">{count(t.id)}</span>
+          </button>
+        ))}
+      </div>
+      {items.length === 0 ? (
+        <Empty>{!loggedIn ? 'Log in to see your inventory.' : !inventoryAt ? 'Reading your inventory…' : active === 'equipped' ? 'You aren’t wearing anything.' : active === 'all' ? 'You carry nothing.' : `No ${label.toLowerCase()}.`}</Empty>
       ) : (
         <div className={`grid grid-cols-3 @sm:grid-cols-4 gap-2 ${bare ? '' : 'max-h-80 overflow-y-auto scroll-thin pr-1'}`}>
-          {carried.map((it) => {
-            const [label, icon] = TYPE_INFO[it.type] ?? ['Item', 'category'];
+          {items.map((it) => {
+            const [typeLabel, icon] = TYPE_INFO[it.type] ?? ['Item', 'category'];
             return (
-              <button key={it.id} onClick={() => setOpen(it)} title={it.plainName}
+              <button key={it.id} onClick={() => setOpen({ item: it, worn: active === 'equipped' })} title={it.plainName}
                 className="aspect-square bg-surface-lowest/50 rounded p-1.5 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-lowest/80 border border-surface-high/30 group">
                 <Icon name={icon} className="text-primary text-xl group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] text-on-surface-variant mt-1 leading-tight line-clamp-2"><SegText segs={it.name} /></span>
-                <span className="font-mono text-[8px] text-outline uppercase mt-0.5">{label} · L{it.level}</span>
+                <span className="font-mono text-[8px] text-outline uppercase mt-0.5">{typeLabel} · L{it.level}</span>
               </button>
             );
           })}
         </div>
       )}
       <div className="p-2.5 rounded bg-surface-lowest/80 border border-surface-high/30 flex items-center justify-between text-xs font-mono text-outline">
-        <span>{inventory.length - carried.length} worn</span>
+        <span>{label}</span>
         <button className="label-caps text-primary hover:underline" onClick={() => game.refreshInventory()} disabled={!loggedIn}>Refresh</button>
       </div>
-      {open && <ItemModal item={open} onClose={() => setOpen(null)} />}
+      {open && <ItemModal item={open.item} worn={open.worn} onClose={() => setOpen(null)} />}
     </section>
   );
 }
 
-function ItemModal({ item, onClose }: { item: InvItem; onClose: () => void }) {
+function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: boolean; onClose: () => void }) {
   const [label, icon, verb] = TYPE_INFO[item.type] ?? ['Item', 'category'];
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -114,9 +136,11 @@ function ItemModal({ item, onClose }: { item: InvItem; onClose: () => void }) {
         )}
         <div className="flex items-center justify-end gap-2 flex-wrap">
           <button className="btn" onClick={() => act(`look ${item.id}`)}>Look</button>
-          <button className="btn btn-danger" onClick={() => act(`drop ${item.id}`)}>Drop</button>
+          {worn
+            ? <button className="btn" onClick={() => act(`remove ${item.id}`)}>Remove</button>
+            : <button className="btn btn-danger" onClick={() => act(`drop ${item.id}`)}>Drop</button>}
           <button className="btn" onClick={() => { fillCommand(` ${item.id}`); onClose(); }}>Use in command…</button>
-          {verb && <button className="btn btn-primary" onClick={() => act(`${verb} ${item.id}`)}>{verb}</button>}
+          {verb && !worn && <button className="btn btn-primary" onClick={() => act(`${verb} ${item.id}`)}>{verb}</button>}
         </div>
       </div>
     </div>

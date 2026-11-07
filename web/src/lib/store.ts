@@ -35,6 +35,7 @@ export interface State {
   roomObjs: Seg[][];
   inventory: InvItem[];
   inventoryAt: number;
+  equipment: InvItem[];
   chat: ChatMsg[];
   group?: { groupname: string; leader: string; members: GroupMember[] };
   tagsListing: string[];
@@ -81,7 +82,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -250,7 +251,7 @@ export class Game {
 
   refreshInventory(delay = 0) {
     clearTimeout(this.invTimer);
-    this.invTimer = setTimeout(() => this.hidden('invdata'), delay);
+    this.invTimer = setTimeout(() => { this.hidden('invdata'); this.hidden('eqdata'); }, delay);
   }
 
   // ---- inbound --------------------------------------------------------------
@@ -398,6 +399,7 @@ export class Game {
     if (tag === 'rdesc') this.set({ roomDesc: nonEmpty.map((l) => plain(l).trim()) });
     else if (tag === 'roomchars') this.set({ roomChars: nonEmpty });
     else if (tag === 'roomobjs') this.set({ roomObjs: nonEmpty });
+    else if (tag === 'eqdata') this.set({ equipment: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x) });
     else if (tag === 'invdata') this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() });
   }
 

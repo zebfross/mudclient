@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { categoryOf } from '../web/src/lib/inventory.ts';
+assert.equal(categoryOf(5), 'weapons');
+assert.equal(categoryOf(7), 'armor');
+assert.equal(categoryOf(6), 'tools', 'treasure, e.g. the Newbie Guide');
+assert.equal(categoryOf(8), 'consumables');
+assert.equal(categoryOf(19), 'consumables');
+assert.equal(categoryOf(1), 'tools');
+assert.equal(categoryOf(11), 'tools');
+console.log('inventory tests passed');

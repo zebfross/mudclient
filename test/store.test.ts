@@ -50,7 +50,7 @@ assert.ok(nameLine.segs[0].fg && nameLine.segs[0].b, 'colour kept');
 
 // invdata hidden, parsed, and its prompt suppressed.
 await new Promise((r) => setTimeout(r, 350));
-assert.equal(sent.at(-1).d, 'invdata');
+assert.deepEqual(sent.slice(-2).map((m) => m.d), ['invdata', 'eqdata']);
 const before = g.state.lines.length;
 g.onMessage({ t: 'text', d: '{invdata}\r\n12345,KM,@Ya @Rshiny, red@w sword,10,5,0,-1,-1\r\n999,,a torch,1,1,0,-1,300\r\n{/invdata}\r\n<prompt> ' });
 g.onMessage({ t: 'prompt' });
@@ -75,7 +75,7 @@ sent.length = 0;
 g.command('get bread');
 await new Promise((r) => setTimeout(r, 900));
 const background = /^(tell -h|campaign check|goals|goal .*|map)$/;
-assert.deepEqual(sent.filter((m) => m.t === 'cmd').map((m) => m.d).filter((d) => !background.test(d)), ['get bread', 'invdata']);
+assert.deepEqual(sent.filter((m) => m.t === 'cmd').map((m) => m.d).filter((d) => !background.test(d)), ['get bread', 'invdata', 'eqdata']);
 // Without GA, an idle partial line is treated as a prompt.
 const g2 = new Game();
 const sent2: any[] = [];
@@ -173,5 +173,10 @@ assert.equal(g3.state.death, null);
 assert.ok(isOwnCorpse('The corpse of Quillonmarsh is lying here.', 'Quillonmarsh'));
 assert.ok(!isOwnCorpse('The corpse of a goblin is lying here.', 'Quillonmarsh'));
 assert.ok(!isOwnCorpse('The corpse of Quillonmarshy lies here.', 'Quillonmarsh'));
+// eqdata (worn items) is parsed into equipment, hidden from the log.
+g3.onMessage({ t: 'text', d: '{eqdata}\r\n77,M,a leather cap,1,7,0,1,-1\r\n{/eqdata}\r\n' });
+await tick();
+assert.deepEqual(g3.state.equipment.map((i) => i.plainName), ['a leather cap']);
+assert.ok(!g3.state.lines.some((l) => plain(l.segs).includes('eqdata')));
 console.log('store tests passed');
 process.exit(0);
