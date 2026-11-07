@@ -40,6 +40,8 @@ export interface State {
   mapVersion: number;
   objectives: Objectives;
   asciiMap: Seg[][];
+  /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
+  death: { at: number } | null;
 }
 
 const MAX_LINES = 3000;
@@ -77,7 +79,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [],
+    inventory: [], inventoryAt: 0, chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null,
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -146,6 +148,7 @@ export class Game {
   disconnect() { this.sendRaw({ t: 'disconnect' }); }
 
   command(cmd: string) {
+    if (this.state.death && /^get all corpse\b/i.test(cmd.trim())) this.set({ death: null });
     const shown = this.state.localEcho ? cmd : '••••••';
     if (plain(this.cur).trim()) {
       // Commit the pending prompt with the command on the same line, as a terminal would.
@@ -332,6 +335,7 @@ export class Game {
       return;
     }
     if (this.mapBlock) this.mapBlock.push(segs);
+    if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
     const hist = TELL_HISTORY_RE.exec(text);
     if (hist) {
       this.importTell(hist);
@@ -427,6 +431,8 @@ export class Game {
     if (!this.state.loggedIn && p.startsWith('char.')) this.onLogin();
   }
 
+  dismissDeath() { this.set({ death: null }); }
+
   /** Fetch Aardwolf's tell history quietly; its lines are merged into the chat as they arrive. */
   requestTellHistory() {
     this.tellHistoryQuietUntil = Date.now() + 4000;
@@ -519,6 +525,13 @@ export function extractMap(lines: Seg[][]): { map: Seg[][]; rest: Seg[][] } {
 
 // First line of a `campaign check` reply, whether or not you're on one.
 const CAMPAIGN_START = /^\s*(You are not currently on a campaign|The targets for this campaign|You still have to kill|You have .* to finish this campaign|Note: One or more target names)/;
+
+// Aardwolf's death announcement.
+export const DEATH_RE = /You have been KILLED!!/i;
+
+/** Is this room-object line your own corpse? ("The corpse of Quillonmarsh is lying here.") */
+export const isOwnCorpse = (line: string, name: string | undefined) =>
+  !!name && new RegExp(`corpse of ${name.replace(/[^A-Za-z]/g, '')}\\b`, 'i').test(line);
 
 const GLUED_PROMPT_RE = /^(.*?[>\]] ?)(?=\{\/?[a-z]+\}|<MAPSTART>|\d{1,2} [A-Z][a-z]{2} \d\d:\d\d:\d\d - )/;
 const TELL_HISTORY_RE = /^(\d{1,2}) ([A-Z][a-z]{2}) (\d{2}):(\d{2}):(\d{2}) - ((?:You tell \S+|\S+ tells you) '.*')\s*$/;

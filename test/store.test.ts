@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Game, parseTell, extractMap } from '../web/src/lib/store.ts';
+import { Game, parseTell, extractMap, isOwnCorpse } from '../web/src/lib/store.ts';
 import { plain } from '../web/src/lib/ansi.ts';
 
 const g = new Game();
@@ -164,5 +164,14 @@ assert.ok(!g3.state.lines.some((l) => /Tag Name|MAPSTART/.test(plain(l.segs))), 
 assert.ok(g3.state.tagsListing.some((l) => /^MAP\s/.test(l)));
 // A chat line that mentions "campaign" is not mistaken for the campaign reply.
 assert.ok(!/^\s*(You are not currently on a campaign|The targets for this campaign)/.test('[Newbie] Kalal: anyone on a campaign?'));
+// Death: banner state set on the death message, cleared by looting.
+g3.onMessage({ t: 'text', d: 'A goblin wallops you!\r\nYou have been KILLED!!\r\n' });
+await tick();
+assert.ok(g3.state.death);
+g3.command('get all corpse');
+assert.equal(g3.state.death, null);
+assert.ok(isOwnCorpse('The corpse of Quillonmarsh is lying here.', 'Quillonmarsh'));
+assert.ok(!isOwnCorpse('The corpse of a goblin is lying here.', 'Quillonmarsh'));
+assert.ok(!isOwnCorpse('The corpse of Quillonmarshy lies here.', 'Quillonmarsh'));
 console.log('store tests passed');
 process.exit(0);
