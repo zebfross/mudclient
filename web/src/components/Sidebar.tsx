@@ -5,16 +5,18 @@ import { Curios, Souls } from './Room.tsx';
 import { Group, Satchel } from './Panels.tsx';
 import { Dispatches } from './Dispatches.tsx';
 import { Objectives } from './Objectives.tsx';
+import { LasertagPanel, useInArena } from './Lasertag.tsx';
 import { questActive } from '../lib/objectives.ts';
 import { Icon } from './ui.tsx';
 
-type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat';
+type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat' | 'laser';
 const TABS: { id: TabId; icon: string; label: string }[] = [
   { id: 'objects', icon: 'category', label: 'Curios & Objects' },
   { id: 'satchel', icon: 'work', label: 'Satchel' },
   { id: 'goals', icon: 'flag', label: 'Objectives' },
   { id: 'souls', icon: 'group', label: 'Souls Present' },
   { id: 'chat', icon: 'forum', label: 'Dispatches' },
+  { id: 'laser', icon: 'target', label: 'Lasertag' },
 ];
 const TAB_KEY = 'gaslamp.sidebarTab';
 
@@ -28,11 +30,14 @@ function loadTab(): TabId {
 
 /** Map pinned on top, icon-tabbed panels below. */
 export function Sidebar({ className = '' }: { className?: string }) {
-  const { chat, roomObjs, roomChars, inventory, objectives } = useGame();
+  const { chat, roomObjs, roomChars, inventory, objectives, lasertag } = useGame();
+  const inArena = useInArena();
   const [tab, setTab] = useState<TabId>(loadTab);
   const [seenChat, setSeenChat] = useState(chat.length);
 
   useEffect(() => { if (tab === 'chat') setSeenChat(chat.length); }, [tab, chat.length]);
+  // Entering the arena brings the Lasertag tab forward.
+  useEffect(() => { if (inArena) setTab('laser'); }, [inArena]);
   const choose = (t: TabId) => {
     setTab(t);
     try { localStorage.setItem(TAB_KEY, t); } catch { /* ignore */ }
@@ -45,6 +50,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     goals: objectives.goals.length + (questActive(objectives.quest) ? 1 : 0) + (objectives.campaign?.active ? 1 : 0),
     souls: roomChars.length,
     chat: unread.length,
+    laser: lasertag.targets.length,
   };
   const tellWaiting = unread.some((c) => isTellChan(c.chan));
 
@@ -54,6 +60,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     goals: <Objectives />,
     souls: <div className="flex flex-col gap-4"><Souls bare /><Group /></div>,
     chat: <Dispatches bare className="h-full" />,
+    laser: <LasertagPanel />,
   };
 
   return (

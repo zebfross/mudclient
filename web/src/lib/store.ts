@@ -3,6 +3,7 @@ import { useSyncExternalStore } from 'react';
 import { AnsiParser, plain, type Seg } from './ansi.ts';
 import { aardSegs, stripAard } from './aardColor.ts';
 import { Mapper, type RoomInfo } from './mapper.ts';
+import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
 
 export interface Line { id: number; segs: Seg[]; kind?: 'echo' | 'sys' | 'prompt' }
@@ -42,6 +43,7 @@ export interface State {
   asciiMap: Seg[][];
   /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
   death: { at: number } | null;
+  lasertag: Lasertag;
 }
 
 const MAX_LINES = 3000;
@@ -79,7 +81,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null,
+    inventory: [], inventoryAt: 0, chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -298,6 +300,9 @@ export class Game {
 
     if (isPrompt) {
       if (text.trim()) this.learnPrompt(text);
+      const ch = parseCharges(text);
+      if (ch) this.lt({ charges: ch.charges, maxCharges: ch.max ?? Math.max(this.state.lasertag.maxCharges ?? 0, ch.charges), chargesAt: Date.now() });
+      if (this.mirror) { this.endMirror(); }
       if (this.setupPending) queueMicrotask(() => this.setupAfterLogin());
       if (this.capture?.started) { this.endCapture(true); return; }
       if (this.suppressPrompts > 0 && Date.now() <= this.suppressPromptsUntil) { this.suppressPrompts--; return; }
@@ -336,6 +341,9 @@ export class Game {
     }
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
+    if (this.mirror) this.mirror.lines.push(text);
+    const team = TEAM_RE.exec(text);
+    if (team) this.lt({ team: team[1].toLowerCase() as Team });
     const hist = TELL_HISTORY_RE.exec(text);
     if (hist) {
       this.importTell(hist);
@@ -412,7 +420,10 @@ export class Game {
         terrain: String(data.terrain ?? ''), details: String(data.details ?? ''),
         exits: mapNums(data.exits ?? {}), coord: data.coord,
       };
-      if (room.num !== this.state.room?.num) this.refreshMap();
+      if (room.num !== this.state.room?.num) {
+        this.refreshMap();
+        if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });
+      }
       this.mapper.add(room);
       this.set({ room, mapVersion: this.state.mapVersion + 1 });
     } else if (p === 'comm.channel') {
@@ -432,6 +443,57 @@ export class Game {
   }
 
   dismissDeath() { this.set({ death: null }); }
+
+  // ---- Lasertag --------------------------------------------------------------
+  private mirror: { lines: string[]; cb: (lines: string[]) => void; timer: ReturnType<typeof setTimeout> } | null = null;
+
+  private lt(patch: Partial<Lasertag>) { this.set({ lasertag: { ...this.state.lasertag, ...patch } }); }
+
+  /** Send a command normally (output still shows in the log) and also hand its reply to `cb`. */
+  private mirrorReply(cmd: string, cb: (lines: string[]) => void) {
+    this.endMirror();
+    this.command(cmd);
+    this.mirror = { lines: [], cb, timer: setTimeout(() => this.endMirror(), 4000) };
+  }
+
+  private endMirror() {
+    const m = this.mirror;
+    if (!m) return;
+    this.mirror = null;
+    clearTimeout(m.timer);
+    m.cb(m.lines);
+  }
+
+  ltScan() { this.mirrorReply('scan', (lines) => this.lt({ targets: parseScan(lines), scanAt: Date.now() })); }
+  ltStatus() {
+    this.mirrorReply('lasertag status', (lines) => {
+      const status = lines.filter((l) => l.trim() && !/^\s*[-=~]{5,}\s*$/.test(l)).map((l) => l.trim());
+      const mins = /next lasertag game will start in (?:approximately )?(\d+) minute/i.exec(status.join(' '))?.[1];
+      this.lt({ status, nextGameAt: mins ? Date.now() + Number(mins) * 60_000 : undefined });
+    });
+  }
+  ltScore() { this.mirrorReply('lasertag score', (lines) => this.lt({ score: lines.filter((l) => l.trim()) })); }
+  ltTeams() {
+    this.mirrorReply('who red', (red) => {
+      this.lt({ rosters: { ...this.state.lasertag.rosters, red: parseRoster(red) } });
+      this.mirrorReply('who green', (green) => {
+        const rosters = { red: this.state.lasertag.rosters.red, green: parseRoster(green) };
+        const me = stripAard(String(this.state.char.base?.name ?? ''));
+        const mine = rosters.red.includes(me) ? 'red' : rosters.green.includes(me) ? 'green' : this.state.lasertag.team;
+        this.lt({ rosters, team: mine });
+      });
+    });
+  }
+  ltShoot(t: Target) {
+    if (this.state.lasertag.firedInRoom === this.state.room?.num) return; // must move between shots
+    this.command(`shoot ${t.dir} ${t.name}`);
+    this.lt({ firedInRoom: this.state.room?.num });
+  }
+  /** Which team a player is on, from scan tags or the rosters. */
+  teamOf(t: Target): Team | undefined {
+    const r = this.state.lasertag.rosters;
+    return t.team ?? (r.red.includes(t.name) ? 'red' : r.green.includes(t.name) ? 'green' : undefined);
+  }
 
   /** Fetch Aardwolf's tell history quietly; its lines are merged into the chat as they arrive. */
   requestTellHistory() {
@@ -525,6 +587,9 @@ export function extractMap(lines: Seg[][]): { map: Seg[][]; rest: Seg[][] } {
 
 // First line of a `campaign check` reply, whether or not you're on one.
 const CAMPAIGN_START = /^\s*(You are not currently on a campaign|The targets for this campaign|You still have to kill|You have .* to finish this campaign|Note: One or more target names)/;
+
+// "You have been assigned to the Red team" / "You are on the green team" (wording unconfirmed).
+const TEAM_RE = /\byou\b.*\b(?:assigned|placed|are on|joined|join)\b.*\b(red|green) team\b/i;
 
 // Aardwolf's death announcement.
 export const DEATH_RE = /You have been KILLED!!/i;
