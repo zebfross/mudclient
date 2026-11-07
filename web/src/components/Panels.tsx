@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { game, useGame, type InvItem } from '../lib/store.ts';
-import { DIR_NAMES } from '../lib/mapper.ts';
 import { stripAard } from '../lib/aardColor.ts';
 import { Bar, CardHead, Empty, Icon, SegText, fillCommand } from './ui.tsx';
 
@@ -27,65 +26,6 @@ export function Group() {
           );
         })}
       </ul>
-    </section>
-  );
-}
-
-// ---- Compass ----------------------------------------------------------------
-export function Compass() {
-  const { room } = useGame();
-  const exits = room?.exits ?? {};
-  const name = (d: string) => (d in exits ? game.mapper.rooms.get(exits[d])?.name ?? 'unexplored' : '');
-  const node = (d: string, pos: string, labelFirst = false) => {
-    const open = d in exits;
-    const label = <span className={`font-mono text-[9px] uppercase tracking-wider text-primary truncate ${d === 'n' || d === 's' ? 'max-w-[110px]' : 'max-w-[64px]'}`}>{name(d)}</span>;
-    return (
-      <button
-        disabled={!open}
-        onClick={() => game.command(DIR_NAMES[d])}
-        title={open ? `${DIR_NAMES[d]}: ${name(d)}` : `No exit ${DIR_NAMES[d]}`}
-        className={`absolute z-20 flex flex-col items-center gap-1 group ${pos} disabled:opacity-35 disabled:cursor-not-allowed`}
-      >
-        {labelFirst && open && label}
-        <span className={`w-9 h-9 rounded-full grid place-items-center shadow-lg font-mono text-xs font-bold transition-transform ${open ? 'bg-primary text-on-primary group-hover:bg-primary-fixed group-hover:scale-110' : 'bg-surface-highest text-outline'}`}>
-          {d.toUpperCase()}
-        </span>
-        {!labelFirst && open && label}
-      </button>
-    );
-  };
-  return (
-    <section className="card p-4 sm:p-5 flex flex-col items-center">
-      <div className="w-full"><CardHead icon="explore" title="Directional Manifold" right={<span className="label-caps text-secondary">Compass</span>} /></div>
-      <div className="relative w-64 h-64 my-2 grid place-items-center">
-        <div className="absolute inset-0 rounded-full bg-surface-lowest shadow-2xl grid place-items-center border border-surface-high/40">
-          <div className="w-[92%] h-[92%] rounded-full bg-surface-mid grid place-items-center shadow-inner">
-            <div className="w-3/4 h-3/4 rounded-full bg-surface-lowest grid place-items-center border border-surface-high/30">
-              <div className="w-1/2 h-1/2 rounded-full bg-surface-low flex flex-col items-center justify-center text-center p-2 shadow-inner">
-                <span className="label-caps text-[9px] text-outline">Room</span>
-                <span className="font-mono text-xs text-primary font-bold">{room ? `#${room.num}` : '—'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-        {node('n', 'top-2 left-1/2 -translate-x-1/2')}
-        {node('s', 'bottom-2 left-1/2 -translate-x-1/2', true)}
-        {node('e', 'right-0 top-[calc(50%-18px)]')}
-        {node('w', 'left-0 top-[calc(50%-18px)]')}
-      </div>
-      <div className="w-full grid grid-cols-2 gap-2 pt-2 border-t border-surface-high/30">
-        {(['u', 'd'] as const).map((d) => (
-          <button key={d} disabled={!(d in exits)} onClick={() => game.command(DIR_NAMES[d])}
-            className="flex items-center justify-between p-2 rounded bg-surface-mid hover:bg-surface-high border border-surface-high/30 disabled:opacity-40 disabled:cursor-not-allowed">
-            <span className="flex items-center gap-1.5 min-w-0">
-              <Icon name={d === 'u' ? 'arrow_upward' : 'arrow_downward'} className="text-primary text-sm" />
-              <span className="label-caps text-on-surface">{d === 'u' ? 'Up' : 'Down'}</span>
-              <span className="font-mono text-[10px] text-outline truncate">{name(d)}</span>
-            </span>
-            <span className={`chip ${d in exits ? 'bg-primary/20 text-primary border-primary/30' : 'bg-surface-lowest text-outline border-surface-high/40'}`}>{d in exits ? 'Open' : 'None'}</span>
-          </button>
-        ))}
-      </div>
     </section>
   );
 }

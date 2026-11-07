@@ -2,7 +2,6 @@ import { useGame } from './lib/store.ts';
 import { Header } from './components/Header.tsx';
 import { Terminal } from './components/Terminal.tsx';
 import { RoomDescription, RoomHeader } from './components/Room.tsx';
-import { Compass } from './components/Panels.tsx';
 import { CommandBar } from './components/CommandBar.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { CardHead, terrainTint } from './components/ui.tsx';
@@ -26,7 +25,6 @@ export function App() {
               </section>
             </div>
             <Sidebar className="lg:hidden" />
-            <Compass />
             <CommandBar />
           </div>
           <aside className="hidden lg:flex lg:col-span-4 sticky top-20 h-[calc(100vh-6rem)] flex-col min-w-0">

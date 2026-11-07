@@ -58,7 +58,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
 
   return (
     <div className={`flex flex-col gap-4 min-h-0 ${className}`}>
-      <Automap compact />
+      <Automap />
       <section className="card flex flex-col flex-1 min-h-[22rem] overflow-hidden">
         <div role="tablist" aria-label="Sidebar panels" className="flex border-b border-surface-high/40 bg-surface-lowest/60">
           {TABS.map((t) => {
