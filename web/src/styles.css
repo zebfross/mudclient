@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: #121110;
+  --color-surface: #141312;
+  --color-surface-lowest: #0c0b0a;
+  --color-surface-low: #1a1918;
+  --color-surface-mid: #201e1d;
+  --color-surface-high: #2b2a28;
+  --color-surface-highest: #363433;
+  --color-surface-bright: #3b3937;
+  --color-on-surface: #e6e1df;
+  --color-on-surface-variant: #dbc2b0;
+  --color-outline: #a38c7c;
+  --color-outline-variant: #554336;
+  --color-primary: #ffb77d;
+  --color-primary-fixed: #ffdcc3;
+  --color-primary-container: #d97707;
+  --color-on-primary: #4d2600;
+  --color-secondary: #ffb68e;
+  --color-secondary-container: #ab4c00;
+  --color-on-secondary: #532200;
+  --color-tertiary: #7bd8b1;
+  --color-tertiary-container: #42a17d;
+  --color-on-tertiary: #003827;
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+
+  --font-display: "Cinzel", serif;
+  --font-body: "Plus Jakarta Sans", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  html, body { margin: 0; background: var(--color-background); color: var(--color-on-surface); }
+  body { font-family: var(--font-body); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  ::selection { background: var(--color-primary); color: var(--color-on-primary); }
+}
+
+.msi {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal;
+  text-transform: none; display: inline-block; white-space: nowrap; direction: ltr;
+  -webkit-font-feature-settings: "liga"; font-feature-settings: "liga";
+  font-size: 1.1em; user-select: none;
+}
+
+@utility label-caps { font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; }
+
+@layer components {
+/* Glass card used throughout the design */
+.card {
+  @apply rounded-xl border border-surface-high/40 bg-surface-lowest/55 backdrop-blur-md shadow-xl;
+}
+.card-head {
+  @apply flex items-center justify-between gap-2 pb-2 mb-3 border-b border-surface-high/40;
+}
+.chip { @apply label-caps rounded border px-2 py-0.5; }
+.btn {
+  @apply label-caps rounded px-2.5 py-1.5 transition-colors inline-flex items-center justify-center gap-1
+         bg-surface-lowest/70 hover:bg-surface-bright text-on-surface border border-surface-high/40;
+}
+.btn-primary { @apply bg-primary text-on-primary hover:bg-primary-fixed border-primary; }
+.btn-secondary { @apply bg-secondary text-on-secondary hover:bg-[#ffdbca] border-secondary; }
+.btn-danger { @apply bg-error-container text-error hover:brightness-125 border-error-container; }
+}
+
+.scroll-thin { scrollbar-width: thin; scrollbar-color: var(--color-surface-highest) transparent; }
+
+/* Atmospheric backdrop: gaslight glow through fog, tinted by terrain */
+.backdrop {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 45% at 18% 8%, color-mix(in srgb, var(--tint, #d97707) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 85% 30%, rgba(255, 183, 125, 0.07), transparent 70%),
+    radial-gradient(ellipse 80% 60% at 50% 110%, rgba(66, 161, 125, 0.06), transparent 70%),
+    linear-gradient(180deg, #171513 0%, #0f0e0d 100%);
+  transition: --tint 1s;
+}
+.backdrop::after {
+  content: ""; position: absolute; inset: -20%;
+  background: radial-gradient(circle at 30% 40%, rgba(230, 225, 223, 0.035), transparent 35%),
+              radial-gradient(circle at 70% 60%, rgba(230, 225, 223, 0.03), transparent 40%);
+  animation: fog 40s ease-in-out infinite alternate;
+}
+@keyframes fog { from { transform: translate3d(-4%, 0, 0); } to { transform: translate3d(4%, -2%, 0); } }
+@media (prefers-reduced-motion: reduce) { .backdrop::after { animation: none; } }

@@ -1,0 +1,413 @@
+<!DOCTYPE html><html class="dark" lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0" name="viewport"><meta content="web_dashboard" name="shell-type"><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;}body{overscroll-behavior:none;}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config={darkMode:"class",theme:{extend:{colors:{"on-secondary-container":"#ffe2d5","tertiary-fixed":"#97f5cc","on-background":"#e6e1df","on-tertiary-fixed-variant":"#00513a","secondary-fixed-dim":"#ffb68e","secondary-fixed":"#ffdbca","on-error-container":"#ffdad6","surface-container-high":"#2b2a28","error":"#ffb4ab","on-primary-fixed":"#2f1500","secondary-container":"#ab4c00","on-surface":"#e6e1df","on-error":"#690005","on-secondary":"#532200","surface-bright":"#3b3937","surface-container-highest":"#363433","inverse-surface":"#e6e1df","on-primary":"#4d2600","surface-variant":"#363433","on-primary-container":"#432100","on-primary-fixed-variant":"#6e3900","background":"#121110","on-secondary-fixed-variant":"#763300","primary-fixed":"#ffdcc3","outline-variant":"#554336","inverse-on-surface":"#32302f","primary":"#ffb77d","on-tertiary-fixed":"#002115","tertiary-container":"#42a17d","tertiary":"#7bd8b1","surface":"#141312","tertiary-fixed-dim":"#7bd8b1","surface-container-low":"#1a1918","primary-fixed-dim":"#ffb77d","surface-container":"#201e1d","on-tertiary-container":"#003121","primary-container":"#d97707","secondary":"#ffb68e","on-tertiary":"#003827","surface-dim":"#121110","error-container":"#93000a","inverse-primary":"#904d00","on-secondary-fixed":"#331200","surface-container-lowest":"#0c0b0a","on-surface-variant":"#dbc2b0","outline":"#a38c7c","surface-tint":"#ffb77d"},borderRadius:{DEFAULT:"0.25rem",lg:"0.5rem",xl:"0.75rem",full:"9999px"},spacing:{"space-sm":"0.5rem","space-lg":"1.5rem","space-xs":"0.25rem","gutter-mobile":"0.75rem",margin:"2rem",gutter:"1.25rem","margin-mobile":"1rem","space-xl":"2.5rem","space-md":"1rem"},fontFamily:{"terminal-input":["JetBrains Mono","monospace"],"display-lg-mobile":["Cinzel","serif"],"body-sm":["Plus Jakarta Sans","sans-serif"],"label-sm":["JetBrains Mono","monospace"],"display-lg":["Cinzel","serif"],"headline-lg":["Cinzel","serif"],"headline-sm":["Cinzel","serif"],"terminal-stream":["JetBrains Mono","monospace"],"body-lg":["Plus Jakarta Sans","sans-serif"],"body-md":["Plus Jakarta Sans","sans-serif"],"headline-lg-mobile":["Cinzel","serif"],"headline-md":["Cinzel","serif"],"label-caps":["JetBrains Mono","monospace"]},fontSize:{"terminal-input":["14px",{lineHeight:"22px",letterSpacing:"0.04em",fontWeight:"600"}],"display-lg-mobile":["32px",{lineHeight:"40px",letterSpacing:"0.03em",fontWeight:"600"}],"body-sm":["13px",{lineHeight:"20px",fontWeight:"400"}],"label-sm":["10px",{lineHeight:"14px",letterSpacing:"0.08em",fontWeight:"500"}],"display-lg":["44px",{lineHeight:"52px",letterSpacing:"0.04em",fontWeight:"600"}],"headline-lg":["28px",{lineHeight:"36px",letterSpacing:"0.03em",fontWeight:"600"}],"headline-sm":["18px",{lineHeight:"26px",letterSpacing:"0.02em",fontWeight:"600"}],"terminal-stream":["12px",{lineHeight:"18px",letterSpacing:"0.02em",fontWeight:"400"}],"body-lg":["17px",{lineHeight:"26px",fontWeight:"400"}],"body-md":["15px",{lineHeight:"24px",fontWeight:"400"}],"headline-lg-mobile":["24px",{lineHeight:"32px",letterSpacing:"0.02em",fontWeight:"600"}],"headline-md":["22px",{lineHeight:"30px",letterSpacing:"0.02em",fontWeight:"600"}],"label-caps":["11px",{lineHeight:"16px",letterSpacing:"0.12em",fontWeight:"700"}]}}}}</script></head><body class="bg-background font-body-md text-on-surface antialiased selection:bg-primary selection:text-on-primary"><header class="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/95 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.85)] border-b border-surface-container-high/40"><div class="h-16 w-full max-w-7xl mx-auto px-4 lg:px-8 flex items-center justify-between gap-4"><div class="flex items-center gap-3 shrink-0"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-2xl">local_fire_department</span><div class="flex flex-col"><span class="font-headline-sm text-[16px] text-primary tracking-wide leading-none">Aether &amp; Ash</span><span class="font-label-sm text-[9px] text-outline tracking-widest uppercase">Chronicles of New Rookwood</span></div></div><div class="hidden sm:flex items-center ml-4 px-2.5 py-1 bg-surface-container-low rounded border border-surface-container-high/30"><span class="material-symbols-outlined text-secondary text-sm mr-1.5">explore</span><span class="font-terminal-stream text-xs text-on-surface-variant">Blackfriars Wynd</span></div></div><div class="hidden md:flex items-center gap-5 px-3.5 py-1.5 rounded border border-surface-container-high/30 shadow-inner bg-surface-container-lowest/40 backdrop-blur-md"><div class="flex items-center gap-1.5"><span class="material-symbols-outlined text-outline text-sm">schedule</span><span class="font-terminal-stream text-xs text-on-surface-variant">11:42 PM</span></div><div class="h-3.5 w-px bg-surface-container-high"></div><div class="flex items-center gap-2"><span class="font-label-sm text-[9px] uppercase text-outline">Sanity</span><div class="w-14 h-1.5 bg-surface-container-highest rounded-full overflow-hidden"><div class="bg-primary h-full w-3/4"></div></div></div><div class="h-3.5 w-px bg-surface-container-high"></div><div class="flex items-center gap-2"><span class="font-label-sm text-[9px] uppercase text-tertiary">Aether</span><div class="w-14 h-1.5 bg-surface-container-highest rounded-full overflow-hidden"><div class="bg-tertiary-container h-full w-1/2"></div></div></div><div class="h-3.5 w-px bg-surface-container-high"></div><div class="flex items-center gap-1"><span class="material-symbols-outlined text-secondary text-xs">monetization_on</span><span class="font-label-caps text-xs text-secondary font-semibold">42s 6d</span></div></div><div class="flex items-center gap-3 shrink-0"><div class="flex items-center gap-1 bg-surface-container px-2 py-1 rounded border border-surface-container-high/30"><button class="p-1 text-on-surface-variant hover:text-primary transition-colors" title="Atmospheric Audio" type="button"><span class="material-symbols-outlined text-base leading-none">volume_up</span></button><button class="p-1 text-on-surface-variant hover:text-primary transition-colors" title="Inquest Log" type="button"><span class="material-symbols-outlined text-base leading-none">auto_stories</span></button><button class="p-1 text-on-surface-variant hover:text-primary transition-colors" title="Valise" type="button"><span class="material-symbols-outlined text-base leading-none">luggage</span></button></div><div class="flex items-center gap-2.5 pl-1"><div class="hidden lg:flex flex-col text-right"><span class="font-body-sm text-xs text-on-surface font-semibold leading-tight">Insp. Silas Finch</span><span class="font-label-sm text-[9px] text-outline">Scotland Yard</span></div><img alt="Profile" class="w-8 h-8 rounded-full object-cover ring-1 ring-primary/40" src="https://lh3.googleusercontent.com/aida-public/AB6AXuByyFWankpvMdmdieHuTDflRucaVnUxXzAxt3FQUqcygAL__CTy2WQlee0payQcTGS1jCqwn0dEDLuaW6mA5dZA3s5LMGYc06A4NmQmZjvVbCH53upyL6JqRhmVgqAkofyW9YHbDmn2SHpvO75q7J0D9D555XO1XLAnt2Rq2-Ir1ug-FFCsMXRfn2TYUU3bTK_hP1nWjrIPzbKl23vdBJde6kksDl5qkvelH1dIpxW9"></div></div></div></header><div><main class="w-full pt-16 bg-background min-h-screen"><div class="flex flex-col w-full">
+<div class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col gap-6">
+<!-- Full-Width Atmospheric Backdrop Hero Canvas -->
+<div class="relative w-full rounded-2xl overflow-hidden border border-surface-container-high/50 shadow-2xl bg-surface-container-lowest/20">
+<!-- Full-span Atmospheric Image with Dark Vignettes & Fog Shroud -->
+<div class="fixed inset-0 z-0 pointer-events-none overflow-hidden"><img alt="Blackfriars Wynd - The Smog Shroud" class="w-full h-full object-cover filter contrast-105 brightness-90" src="https://lh3.googleusercontent.com/aida/AEtjO1U4Qm7kA7y_eZEevgB7vjRSKMz0Bba6qEKlxMMsfVOzxmgemcOI2DTj6V7MKOAGalGEfMCVOkBZ3odeMiqwO6lQ2jqsVgKYp45Y6CCQ9KBRzO5Of_s-c3JpcWIvpW-0AsQ1JYH65mqpL83D2iLSnsml1cLq8regbq3d9OKsTDjEWUOz9JupMvi0uSyiAfMNLcqYgobIE9dcZ_tRAQsP-x-mdi57sR9514VxFMHT_40phw"><div class="absolute inset-0 bg-background/20 backdrop-blur-[1px]"></div><div class="absolute inset-0 bg-radial-gradient from-transparent via-background/40 to-background/70 pointer-events-none"></div></div>
+<!-- Foreground Content over the Vista -->
+<div class="relative z-10 p-5 sm:p-7 flex flex-col gap-6">
+<!-- Room Header & Locus Telemetry -->
+<div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-4 border-b border-surface-container-high/40">
+<div class="flex flex-col gap-1.5">
+<div class="flex items-center gap-2.5 flex-wrap">
+<span class="material-symbols-outlined text-primary text-2xl animate-pulse">foggy</span>
+<h1 class="font-headline-lg text-2xl sm:text-3xl text-primary font-bold tracking-wide">Blackfriars Wynd</h1>
+<span class="font-label-caps text-[10px] bg-primary/20 text-primary px-2.5 py-0.5 rounded border border-primary/30 uppercase tracking-widest font-semibold">Sector VII</span>
+<span class="font-label-caps text-[10px] bg-surface-container-lowest/80 text-secondary px-2 py-0.5 rounded border border-secondary/40 uppercase">St. Jude's Shadow</span>
+</div>
+<p class="font-terminal-stream text-xs text-on-surface-variant flex items-center gap-2">
+<span class="material-symbols-outlined text-xs text-outline">pin_drop</span>
+<span class="">Locus No. 1884 • 51.512° N, 0.103° W • Gaslamp Radius: 15 yds</span>
+</p>
+</div>
+<div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+<div class="flex items-center gap-2 bg-surface-container-lowest/90 backdrop-blur-md px-3 py-1.5 rounded-lg border border-surface-container-high/40 shadow-inner">
+<span class="material-symbols-outlined text-outline text-sm">air</span>
+<span class="font-label-sm text-outline uppercase text-[10px]">Barometer:</span>
+<span class="font-terminal-input text-xs text-tertiary font-bold">29.42 inHg ↓</span>
+</div>
+<div class="flex items-center gap-2.5 bg-surface-container-lowest/90 backdrop-blur-md px-3.5 py-1.5 rounded-lg border border-surface-container-high/40 shadow-inner">
+<span class="material-symbols-outlined text-primary text-sm">flashlight_on</span>
+<span class="font-label-sm text-outline uppercase text-[10px]">Lantern:</span>
+<div class="w-16 h-1.5 bg-surface-container-high rounded-full overflow-hidden">
+<div class="bg-gradient-to-r from-primary-container to-primary h-full w-4/5"></div>
+</div>
+<span class="font-terminal-input text-xs text-primary font-bold">82%</span>
+</div>
+</div>
+</div>
+<!-- Foreground Dual Block: Parchment Chronicle & Interactive In-Scene Landmarks -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+<!-- Rich Room Description / Parchment Chronicle (7 Cols) -->
+<div class="lg:col-span-7 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-primary/30 shadow-2xl flex flex-col gap-3.5 bg-surface-container-lowest/40"><div class="flex items-center justify-between pb-2 border-b border-surface-container-high/30"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-lg">history_edu</span><h2 class="font-headline-sm text-base text-primary tracking-wide font-semibold">Parchment Chronicle &amp; Wynd Log</h2></div><span class="font-label-sm text-[10px] text-outline font-terminal-input">AETHER TRANSCRIBED</span></div><p class="font-body-md text-sm text-on-surface leading-relaxed border-l-2 border-primary/60 pl-3 italic text-opacity-90 p-2.5 rounded-r shadow-inner bg-surface-container-lowest/40">Yellow sulfurous fog coils thick about greasy flagstones. Above, the Gothic gargoyles of St. Jude loom like silent wardens through the chimney soot. The rhythmic churning of subterranean steam hiss periodically from beneath the iron grating.</p><div class="rounded-xl p-4 border border-primary/30 bg-surface-container-lowest/40 backdrop-blur-md shadow-xl flex flex-col gap-3 my-1"><div class="flex items-center justify-between pb-2 border-b border-surface-container-high/30"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-base">explore</span><span class="font-headline-sm text-xs sm:text-sm text-primary font-semibold tracking-wide">Automap • Sector VII</span><span class="font-label-caps text-[9px] text-outline ml-1">Sector Wynd Topology</span></div><div class="flex items-center gap-2"><span class="font-label-caps text-[9px] bg-primary/20 text-primary px-2 py-0.5 rounded border border-primary/30 font-semibold tracking-wider uppercase">Aardwolf Link Active</span><span class="font-label-sm text-[10px] text-outline font-terminal-input">11:42 PM</span></div></div><div class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 rounded-xl border border-surface-container-high/40 bg-surface-container-lowest/70 shadow-inner"><div class="relative flex flex-col items-center justify-center py-2 select-none w-full max-w-sm mx-auto"><div class="relative w-full max-w-xs mx-auto py-2"><div class="grid grid-cols-5 gap-y-2 gap-x-2 items-center justify-items-center w-full"><div class="w-9 h-9"></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-high/80 border border-surface-container-high hover:border-primary/60 cursor-pointer transition-all hover:scale-105 shadow"><span class="material-symbols-outlined text-outline group-hover:text-on-surface text-base">wb_twilight</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-surface-container-high/50 text-[10px] font-terminal-stream text-on-surface rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">North Flagstones</div></div><div class="w-9 h-9 flex items-center justify-center"><div class="w-full h-0.5 bg-outline-variant/40 rounded-full"></div></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-[#22c55e] border border-[#22c55e] text-on-surface font-bold hover:brightness-110 cursor-pointer transition-all hover:scale-105 shadow-md shadow-[#22c55e]/20"><span class="material-symbols-outlined text-surface-container-lowest text-base">storefront</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-[#22c55e]/50 text-[10px] font-terminal-stream text-[#22c55e] rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Apothecary &amp; Trade</div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9 flex items-center justify-center"><div class="h-full w-0.5 bg-outline-variant/40 rounded-full"></div></div><div class="w-9 h-9"></div><div class="w-9 h-9 flex items-center justify-center"><div class="h-full w-0.5 bg-[#06b6d4] rounded-full"></div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-high/80 border border-surface-container-high hover:border-primary/60 cursor-pointer transition-all hover:scale-105 shadow"><span class="material-symbols-outlined text-outline group-hover:text-on-surface text-base">church</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-surface-container-high/50 text-[10px] font-terminal-stream text-on-surface rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">St. Jude's Archway</div></div><div class="w-9 h-9 flex items-center justify-center"><div class="w-full h-0.5 bg-outline-variant/40 rounded-full"></div></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-[#06b6d4] border border-[#06b6d4] hover:brightness-110 cursor-pointer transition-all hover:scale-105 shadow-md shadow-[#06b6d4]/20"><span class="material-symbols-outlined text-surface-container-lowest text-base font-bold">add</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-[#06b6d4]/50 text-[10px] font-terminal-stream text-[#06b6d4] rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">St. Jude's Almonry (Sanctuary)</div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9 flex items-center justify-center"><div class="h-full w-0.5 bg-primary rounded-full"></div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-[#ec4899] border border-[#ec4899] hover:brightness-110 cursor-pointer transition-all hover:scale-105 shadow-md shadow-[#ec4899]/25"><span class="material-symbols-outlined text-surface-container-lowest text-base">diamond</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-[#ec4899]/50 text-[10px] font-terminal-stream text-[#ec4899] rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Old Curiosity Shop (Curios)</div></div><div class="w-9 h-9 flex items-center justify-center"><div class="w-full h-0.5 bg-primary rounded-full"></div></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-primary border-2 border-primary-fixed cursor-pointer transition-all hover:scale-110 shadow-lg shadow-primary/40 ring-2 ring-primary/40"><span class="material-symbols-outlined text-on-primary text-lg animate-pulse font-bold">my_location</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-primary text-[10px] font-terminal-stream text-primary font-bold rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Current Locus (Wynd)</div></div><div class="w-9 h-9 flex items-center justify-center"><div class="w-full h-0.5 bg-[#ef4444] rounded-full"></div></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-[#ef4444] border border-[#ef4444] hover:brightness-110 cursor-pointer transition-all hover:scale-105 shadow-md shadow-[#ef4444]/25"><span class="material-symbols-outlined text-surface-container-lowest text-base">warning</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-[#ef4444]/50 text-[10px] font-terminal-stream text-[#ef4444] rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Hazard: Blind Alley</div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9 flex items-center justify-center"><div class="h-full w-0.5 bg-outline-variant/40 rounded-full"></div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-high/80 border border-surface-container-high hover:border-primary/60 cursor-pointer transition-all hover:scale-105 shadow"><span class="material-symbols-outlined text-outline group-hover:text-on-surface text-base">water_damage</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-surface-container-high/50 text-[10px] font-terminal-stream text-on-surface rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">South Sewer Pass</div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="w-9 h-9 flex items-center justify-center"><div class="h-full w-0.5 bg-outline-variant/40 rounded-full"></div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-surface-container-high/80 border border-surface-container-high hover:border-primary/60 cursor-pointer transition-all hover:scale-105 shadow"><span class="material-symbols-outlined text-outline group-hover:text-on-surface text-base">fence</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-surface-container-high/50 text-[10px] font-terminal-stream text-on-surface rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Watchpost Grate</div></div><div class="w-9 h-9 flex items-center justify-center"><div class="w-full h-0.5 bg-[#22c55e] rounded-full"></div></div><div class="group relative flex items-center justify-center w-9 h-9 rounded-lg bg-[#22c55e] border border-[#22c55e] hover:brightness-110 cursor-pointer transition-all hover:scale-105 shadow-md shadow-[#22c55e]/25"><span class="material-symbols-outlined text-surface-container-lowest text-base">directions_walk</span><div class="absolute -top-7 left-1/2 -translate-x-1/2 hidden group-hover:flex px-2 py-0.5 bg-surface-container-lowest border border-[#22c55e]/50 text-[10px] font-terminal-stream text-[#22c55e] rounded shadow-xl whitespace-nowrap z-20 pointer-events-none">Way to Thames Docks</div></div><div class="w-9 h-9"></div><div class="w-9 h-9"></div></div></div></div><div class="flex flex-col justify-center gap-2.5 w-full md:w-48 shrink-0"><div class="text-[10px] font-label-caps uppercase text-outline tracking-wider border-b border-surface-container-high/30 pb-1 text-center md:text-left">Traverse Direction</div><div class="grid grid-cols-2 gap-1.5"><button class="p-2 rounded border border-surface-container-high/40 bg-surface-container-lowest/90 hover:bg-primary/20 hover:border-primary/50 transition-all flex items-center justify-center gap-1 font-terminal-input text-xs text-primary font-bold shadow-sm" onclick="executeMovement('North')" type="button"><span class="material-symbols-outlined text-xs">north</span> North</button><button class="p-2 rounded border border-surface-container-high/40 bg-surface-container-lowest/90 hover:bg-primary/20 hover:border-primary/50 transition-all flex items-center justify-center gap-1 font-terminal-input text-xs text-primary font-bold shadow-sm" onclick="executeMovement('South')" type="button"><span class="material-symbols-outlined text-xs">south</span> South</button><button class="p-2 rounded border border-surface-container-high/40 bg-surface-container-lowest/90 hover:bg-secondary/20 hover:border-secondary/50 transition-all flex items-center justify-center gap-1 font-terminal-input text-xs text-secondary font-bold shadow-sm" onclick="executeMovement('West')" type="button"><span class="material-symbols-outlined text-xs">west</span> Shop</button><button class="p-2 rounded border border-surface-container-high/40 bg-surface-container-lowest/90 hover:bg-error/20 hover:border-error/50 transition-all flex items-center justify-center gap-1 font-terminal-input text-xs text-error font-bold shadow-sm" onclick="executeMovement('East')" type="button"><span class="material-symbols-outlined text-xs">east</span> Alley</button></div></div></div></div><div class="rounded-lg p-3 flex flex-col gap-2 max-h-44 overflow-y-auto font-terminal-stream text-xs border border-surface-container-high/30 shadow-inner bg-surface-container-lowest/30" id="mud-chronicle-log"><div class="flex items-start gap-2 text-secondary"><span class="text-outline-variant shrink-0 font-medium">[23:41:12]</span><span class="">Iron grate rattles; rhythmic steam vents from below.</span></div><div class="flex items-start gap-2 text-primary"><span class="text-outline-variant shrink-0 font-medium">[23:41:30]</span><span class="text-on-surface">Perception <strong class="text-primary font-semibold">[17]</strong>: Amber light flickers inside the abandoned curiosity shop.</span></div><div class="flex items-start gap-2 text-secondary"><span class="text-outline-variant shrink-0 font-medium">[23:41:45]</span><span class=""><strong class="text-secondary font-semibold">Dr. Aris Thorne</strong> emerges from the foggy alleyway, lantern swinging low.</span></div><div class="flex items-start gap-2 text-primary"><span class="text-outline-variant shrink-0 font-medium">[23:41:52]</span><span class=""><strong class="text-primary font-semibold">Lady Maeve Sterling</strong> nods toward you silently from beneath her velvet cowl.</span></div></div></div>
+<!-- In-Scene Focal Points & Souls in Wynd (5 Cols) -->
+<div class="lg:col-span-5 flex flex-col gap-4">
+<!-- Souls Present in View -->
+<div class="backdrop-blur-md rounded-xl p-4 border border-secondary/30 shadow-2xl flex flex-col gap-3 bg-surface-container-lowest/40"><div class="flex items-center justify-between pb-1.5 border-b border-surface-container-high/30"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-lg">group</span><h3 class="font-headline-sm text-sm text-on-surface font-semibold">Souls Present in Wynd</h3></div><span class="font-label-caps text-[10px] bg-surface-container-lowest/80 px-2 py-0.5 rounded text-secondary uppercase border border-surface-container-high/30 font-semibold">2 Detected</span></div><div class="flex flex-col gap-2.5"><div class="bg-surface-container-lowest/30 backdrop-blur-md p-2.5 rounded-lg border border-surface-container-high/40 flex items-center justify-between gap-2 shadow-inner"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-secondary-container/20 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-secondary text-base">medical_services</span></div><div class="flex flex-col"><div class="flex items-center gap-1.5"><span class="font-headline-sm text-xs text-on-surface font-semibold">Dr. Aris Thorne</span><span class="text-[9px] font-label-caps bg-surface-container/60 px-1 rounded text-outline uppercase">Lvl 4</span></div><span class="font-label-sm text-[10px] text-tertiary">Physician • Examining</span></div></div><div class="flex items-center gap-1.5"><button class="bg-surface-container-highest/60 hover:bg-surface-bright text-on-surface py-1 px-2 rounded font-label-caps text-[9px] uppercase transition-colors" onclick="appendLog('You tip your hat to Dr. Aris Thorne.')" type="button">Hail</button><button class="bg-secondary hover:bg-secondary-fixed text-on-secondary py-1 px-2 rounded font-label-caps text-[9px] uppercase font-bold transition-colors flex items-center gap-0.5" onclick="appendLog('Proposed barter exchange to Dr. Aris Thorne.')" type="button"><span class="material-symbols-outlined text-[11px]">swap_horiz</span> Trade</button></div></div><div class="bg-surface-container-lowest/30 backdrop-blur-md p-2.5 rounded-lg border border-surface-container-high/40 flex items-center justify-between gap-2 shadow-inner"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-primary-container/20 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-primary text-base">auto_fix_high</span></div><div class="flex flex-col"><div class="flex items-center gap-1.5"><span class="font-headline-sm text-xs text-on-surface font-semibold">Lady Maeve Sterling</span><span class="text-[9px] font-label-caps bg-surface-container/60 px-1 rounded text-outline uppercase">Lvl 6</span></div><span class="font-label-sm text-[10px] text-primary">Occultist • Resting</span></div></div><div class="flex items-center gap-1.5"><button class="bg-surface-container-highest/60 hover:bg-surface-bright text-on-surface py-1 px-2 rounded font-label-caps text-[9px] uppercase transition-colors" onclick="appendLog('You offer formal greetings to Lady Maeve Sterling.')" type="button">Hail</button><button class="bg-primary hover:bg-primary-fixed text-on-primary py-1 px-2 rounded font-label-caps text-[9px] uppercase font-bold transition-colors flex items-center gap-0.5" onclick="appendLog('Requested occult consultation with Lady Maeve Sterling.')" type="button"><span class="material-symbols-outlined text-[11px]">visibility</span> Inspect</button></div></div></div></div>
+<!-- Quick Gaslamp Clue Box -->
+<div class="backdrop-blur-md p-3 rounded-xl border border-surface-container-high/40 shadow-xl flex items-center gap-3 bg-surface-container-lowest/40"><span class="material-symbols-outlined text-primary text-lg shrink-0">visibility</span><p class="font-body-sm text-xs text-on-surface leading-snug">Burnt sulfur lingers nearby. Fresh tracks lead toward the curiosity shop door.</p></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Interactive Objects & Curios in Area (Prominently Surfaced Foreground Cards) -->
+<div class="rounded-xl p-4 sm:p-5 shadow-xl flex flex-col gap-4 border border-surface-container-high/30 bg-surface-container-lowest/40 backdrop-blur-md">
+<div class="flex items-center justify-between pb-1.5 border-b border-surface-container-high/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-secondary text-xl">qr_code_2</span>
+<h3 class="font-headline-sm text-base text-on-surface font-semibold">Curios &amp; Objects of Interest</h3>
+</div>
+<span class="font-label-caps text-[10px] bg-surface-container px-2.5 py-0.5 rounded text-outline uppercase border border-surface-container-high/30 font-semibold">4 Items in Reach</span>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5"><div class="bg-surface-container-lowest/40 backdrop-blur-md p-3.5 rounded-lg border border-primary/30 shadow-md hover:bg-surface-container-lowest/60 transition-all flex flex-col justify-between gap-3 relative group"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-primary-container/20 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-primary text-xl">watch</span></div><div class="flex flex-col"><span class="font-headline-sm text-xs text-primary font-semibold">Rune Brass Watch</span><span class="font-label-sm text-[9px] text-outline">12.8 oz • Tier IV</span></div></div><span class="font-label-sm text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded uppercase font-semibold">Aetheric</span></div><div class="flex items-center gap-1.5 pt-1 border-t border-surface-container-high/30"><button class="flex-1 bg-surface-container-lowest/60 hover:bg-surface-bright text-on-surface py-1.5 px-2 rounded font-label-caps text-[10px] text-center uppercase transition-colors" onclick="openInspector('watch')" type="button">Inspect</button><button class="bg-primary hover:bg-primary-fixed text-on-primary py-1.5 px-2.5 rounded font-label-caps text-[10px] uppercase font-bold transition-colors flex items-center gap-1" onclick="pickupItem('Rune-Etched Brass Watch')" type="button"><span class="material-symbols-outlined text-xs">back_hand</span> Take</button></div></div><div class="bg-surface-container-lowest/40 backdrop-blur-md p-3.5 rounded-lg border border-secondary/30 shadow-md hover:bg-surface-container-lowest/60 transition-all flex flex-col justify-between gap-3 relative group"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-secondary-container/20 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-secondary text-xl">newspaper</span></div><div class="flex flex-col"><span class="font-headline-sm text-xs text-secondary font-semibold">London Gazette</span><span class="font-label-sm text-[9px] text-outline">Vol. LXIV • Newsprint</span></div></div><span class="font-label-sm text-[9px] bg-surface-container-lowest/80 text-outline px-1.5 py-0.5 rounded uppercase font-semibold">Printed</span></div><div class="flex items-center gap-1.5 pt-1 border-t border-surface-container-high/30"><button class="flex-1 bg-surface-container-lowest/60 hover:bg-surface-bright text-on-surface py-1.5 px-2 rounded font-label-caps text-[10px] text-center uppercase transition-colors" onclick="openInspector('gazette')" type="button">Inspect</button><button class="bg-surface-container-lowest/80 hover:bg-surface-bright text-on-surface py-1.5 px-2.5 rounded font-label-caps text-[10px] uppercase font-bold transition-colors flex items-center gap-1" onclick="pickupItem('London Gazette')" type="button"><span class="material-symbols-outlined text-xs">archive</span> Pocket</button></div></div><div class="bg-surface-container-lowest/40 backdrop-blur-md p-3.5 rounded-lg border border-tertiary/30 shadow-md hover:bg-surface-container-lowest/60 transition-all flex flex-col justify-between gap-3 relative group"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-tertiary-container/20 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-tertiary text-xl">science</span></div><div class="flex flex-col"><span class="font-headline-sm text-xs text-tertiary font-semibold">Cobalt Phial</span><span class="font-label-sm text-[9px] text-outline">5.4 oz • Tier II</span></div></div><span class="font-label-sm text-[9px] bg-tertiary/20 text-tertiary px-1.5 py-0.5 rounded uppercase font-semibold">Tincture</span></div><div class="flex items-center gap-1.5 pt-1 border-t border-surface-container-high/30"><button class="flex-1 bg-surface-container-lowest/60 hover:bg-surface-bright text-on-surface py-1.5 px-2 rounded font-label-caps text-[10px] text-center uppercase transition-colors" onclick="openInspector('phial')" type="button">Inspect</button><button class="bg-tertiary hover:bg-tertiary-fixed text-on-tertiary py-1.5 px-2.5 rounded font-label-caps text-[10px] uppercase font-bold transition-colors flex items-center gap-1" onclick="pickupItem('Cobalt Phial')" type="button"><span class="material-symbols-outlined text-xs">colorize</span> Satchel</button></div></div><div class="bg-surface-container-lowest/40 backdrop-blur-md p-3.5 rounded-lg border border-surface-container-high/40 shadow-md hover:bg-surface-container-lowest/60 transition-all flex flex-col justify-between gap-3 relative group"><div class="flex items-center justify-between gap-2"><div class="flex items-center gap-2.5"><div class="w-8 h-8 rounded bg-surface-container-lowest/80 flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline text-xl">grid_goldenratio</span></div><div class="flex flex-col"><span class="font-headline-sm text-xs text-on-surface font-semibold">Iron Grate</span><span class="font-label-sm text-[9px] text-outline">Bramah Lever Padlock</span></div></div><span class="font-label-sm text-[9px] bg-error-container text-error px-1.5 py-0.5 rounded uppercase font-semibold">Locked</span></div><div class="flex items-center gap-1.5 pt-1 border-t border-surface-container-high/30"><button class="flex-1 bg-surface-container-lowest/60 hover:bg-surface-bright text-on-surface py-1.5 px-2 rounded font-label-caps text-[10px] text-center uppercase transition-colors" onclick="openInspector('grate')" type="button">Examine</button><button class="bg-secondary-container hover:bg-secondary text-on-secondary py-1.5 px-2.5 rounded font-label-caps text-[10px] uppercase font-bold transition-colors flex items-center gap-1" onclick="attemptPicklock()" type="button"><span class="material-symbols-outlined text-xs">vpn_key</span> Picklock</button></div></div></div>
+</div>
+<!-- Navigation Console & Satchel Inventory Deck -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- Directional Manifold (6 Cols) -->
+<div class="lg:col-span-6 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col items-center border border-surface-container-high/30 bg-surface-container-lowest/40 backdrop-blur-md">
+<div class="w-full flex items-center justify-between pb-2 border-b border-surface-container-high/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-lg">explore</span>
+<span class="font-headline-sm text-sm text-on-surface font-semibold">Directional Manifold</span>
+</div>
+<span class="font-label-caps text-[10px] text-secondary uppercase font-semibold">Hydraulic Compass</span>
+</div>
+<!-- Compass Dial -->
+<div class="relative w-64 h-64 sm:w-68 sm:h-68 my-2 flex items-center justify-center">
+<div class="absolute inset-0 rounded-full bg-surface-container-lowest shadow-2xl flex items-center justify-center border border-surface-container-high/40">
+<div class="w-11/12 h-11/12 rounded-full bg-surface-container flex items-center justify-center shadow-inner">
+<div class="w-3/4 h-3/4 rounded-full bg-surface-container-lowest flex items-center justify-center border border-surface-container-high/30">
+<div class="w-1/2 h-1/2 rounded-full bg-surface-container-low flex flex-col items-center justify-center text-center p-2 shadow-inner">
+<span class="font-label-caps text-[10px] text-outline uppercase tracking-wider">Wynd</span>
+<span class="font-terminal-input text-xs text-primary font-bold">11:42</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Compass Nodes -->
+<button class="absolute top-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center group" onclick="executeMovement('North')" title="St. Jude's Square" type="button">
+<span class="w-9 h-9 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-lg transition-transform group-hover:-translate-y-0.5">
+<span class="font-terminal-input text-xs font-bold">N</span>
+</span>
+<span class="font-label-sm text-[10px] text-primary tracking-wider uppercase mt-1">Square</span>
+</button>
+<button class="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center group" onclick="executeMovement('South')" title="Miller's Wharf" type="button">
+<span class="font-label-sm text-[10px] text-primary tracking-wider uppercase mb-1">Wharf</span>
+<span class="w-9 h-9 rounded-full bg-primary hover:bg-primary-fixed text-on-primary flex items-center justify-center shadow-lg transition-transform group-hover:translate-y-0.5">
+<span class="font-terminal-input text-xs font-bold">S</span>
+</span>
+</button>
+<button class="absolute right-2 top-1/2 -translate-y-1/2 z-20 flex flex-row items-center group" onclick="executeMovement('East')" title="Curiosity Shop" type="button">
+<span class="font-label-sm text-[10px] text-secondary uppercase mr-1.5">Shop</span>
+<span class="w-9 h-9 rounded-full bg-secondary hover:bg-secondary-fixed text-on-secondary flex items-center justify-center shadow-lg transition-transform group-hover:translate-x-0.5">
+<span class="font-terminal-input text-xs font-bold">E</span>
+</span>
+</button>
+<button class="absolute left-2 top-1/2 -translate-y-1/2 z-20 flex flex-row items-center group" onclick="executeMovement('West')" title="Blind Man's Alley" type="button">
+<span class="w-9 h-9 rounded-full bg-surface-container-highest hover:bg-surface-bright text-on-surface-variant flex items-center justify-center shadow-md transition-transform group-hover:-translate-x-0.5">
+<span class="font-terminal-input text-xs font-bold">W</span>
+</span>
+<span class="font-label-sm text-[10px] text-outline uppercase ml-1.5">Alley</span>
+</button>
+</div>
+<!-- Vertical Traversal Indicators -->
+<div class="w-full grid grid-cols-2 gap-2 pt-2 border-t border-surface-container-high/30">
+<button class="flex items-center justify-between p-2 rounded bg-surface-container hover:bg-surface-container-high transition-colors border border-surface-container-high/30" onclick="executeMovement('Up')" type="button">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-primary text-sm">arrow_upward</span>
+<span class="font-label-caps text-[10px] text-on-surface uppercase">Ladder [U]</span>
+</div>
+<span class="font-label-sm text-[9px] bg-primary/20 text-primary px-1.5 py-0.5 rounded font-bold">OPEN</span>
+</button>
+<button class="flex items-center justify-between p-2 rounded bg-surface-container hover:bg-surface-container-high transition-colors border border-surface-container-high/30" onclick="executeMovement('Down')" type="button">
+<div class="flex items-center gap-1.5">
+<span class="material-symbols-outlined text-error text-sm">arrow_downward</span>
+<span class="font-label-caps text-[10px] text-on-surface uppercase">Grate [D]</span>
+</div>
+<span class="font-label-sm text-[9px] bg-error-container text-error px-1.5 py-0.5 rounded font-bold">LOCK</span>
+</button>
+</div>
+</div>
+<!-- Satchel & Equipment Manifold (6 Cols) -->
+<div class="lg:col-span-6 rounded-xl p-4 sm:p-5 shadow-xl flex flex-col justify-between gap-4 border border-surface-container-high/30 bg-surface-container-lowest/40 backdrop-blur-md">
+<div class="flex items-center justify-between pb-1.5 border-b border-surface-container-high/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-outline text-lg">work</span>
+<span class="font-headline-sm text-sm text-on-surface font-semibold">Investigator's Satchel</span>
+</div>
+<span class="font-label-sm text-[10px] text-on-surface-variant font-terminal-input">4 / 8 SLOTS IN USE</span>
+</div>
+<div class="grid grid-cols-4 gap-2.5"><div class="aspect-square bg-surface-container-lowest/50 backdrop-blur-sm rounded p-1 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-container-lowest/70 transition-colors cursor-pointer group border border-surface-container-high/30"><span class="material-symbols-outlined text-primary text-xl group-hover:scale-110 transition-transform">flashlight_on</span><span class="font-label-sm text-[9px] text-on-surface-variant uppercase mt-1 leading-tight font-semibold">Lantern</span></div><div class="aspect-square bg-surface-container-lowest/50 backdrop-blur-sm rounded p-1 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-container-lowest/70 transition-colors cursor-pointer group border border-surface-container-high/30"><span class="material-symbols-outlined text-secondary text-xl group-hover:scale-110 transition-transform">vpn_key</span><span class="font-label-sm text-[9px] text-on-surface-variant uppercase mt-1 leading-tight font-semibold">Picks</span></div><div class="aspect-square bg-surface-container-lowest/50 backdrop-blur-sm rounded p-1 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-container-lowest/70 transition-colors cursor-pointer group border border-surface-container-high/30"><span class="material-symbols-outlined text-tertiary text-xl group-hover:scale-110 transition-transform">menu_book</span><span class="font-label-sm text-[9px] text-on-surface-variant uppercase mt-1 leading-tight font-semibold">Log</span></div><div class="aspect-square bg-surface-container-lowest/50 backdrop-blur-sm rounded p-1 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-container-lowest/70 transition-colors cursor-pointer group border border-surface-container-high/30"><span class="material-symbols-outlined text-on-surface-variant text-xl group-hover:scale-110 transition-transform">colorize</span><span class="font-label-sm text-[9px] text-on-surface-variant uppercase mt-1 leading-tight font-semibold">Needle</span></div><div class="aspect-square bg-surface-container-lowest/20 backdrop-blur-sm rounded border border-dashed border-outline-variant/30 flex items-center justify-center text-outline-variant"><span class="font-label-sm text-[9px]">EMPTY</span></div><div class="aspect-square bg-surface-container-lowest/20 backdrop-blur-sm rounded border border-dashed border-outline-variant/30 flex items-center justify-center text-outline-variant"><span class="font-label-sm text-[9px]">EMPTY</span></div><div class="aspect-square bg-surface-container-lowest/20 backdrop-blur-sm rounded border border-dashed border-outline-variant/30 flex items-center justify-center text-outline-variant"><span class="font-label-sm text-[9px]">EMPTY</span></div><div class="aspect-square bg-surface-container-lowest/20 backdrop-blur-sm rounded border border-dashed border-outline-variant/30 flex items-center justify-center text-outline-variant"><span class="font-label-sm text-[9px]">EMPTY</span></div></div>
+<div class="p-2.5 rounded bg-surface-container-lowest/80 border border-surface-container-high/30 flex items-center justify-between text-xs font-terminal-stream text-outline">
+<span class="">Pouch Weight: 4.8 lbs / 20 lbs</span>
+<button class="text-primary hover:underline font-label-caps text-[10px] uppercase font-bold" onclick="insertCommand('inventory')" type="button">Manage</button>
+</div>
+</div>
+</div>
+<!-- 5. Fixed MUD Command Line / Natural Language Terminal -->
+<div class="sticky bottom-4 z-40 backdrop-blur-md rounded-xl p-3 sm:p-3.5 shadow-[0_-8px_30px_rgba(0,0,0,0.85)] border border-surface-container-high/40 flex flex-col gap-2 bg-surface-container-lowest/70">
+<!-- Quick Command Action Chips -->
+<div class="flex items-center gap-1.5 overflow-x-auto pb-0.5 text-on-surface-variant">
+<span class="font-label-caps text-[10px] text-outline uppercase tracking-wider shrink-0 mr-1">Quick:</span>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20" onclick="insertCommand('look')" type="button">look</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20" onclick="insertCommand('inventory')" type="button">inventory</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20" onclick="insertCommand('listen')" type="button">listen</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20" onclick="insertCommand('inspect brass watch')" type="button">inspect watch</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20" onclick="insertCommand('rest')" type="button">rest</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-secondary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20 text-secondary" onclick="insertCommand('hail ')" type="button">hail</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-secondary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20 text-secondary" onclick="insertCommand('whisper ')" type="button">whisper</button>
+<button class="bg-surface-container hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-terminal-input text-[11px] uppercase transition-colors shrink-0 border border-surface-container-high/20 text-primary" onclick="insertCommand('trade ')" type="button">trade</button>
+</div>
+<!-- Telegram Terminal Prompt Bar -->
+<form class="flex items-center gap-2 sm:gap-3" id="mud-input-form" onsubmit="handleMUDSubmit(event)">
+<div class="flex-1 flex items-center bg-surface-container rounded px-3 py-2 border border-surface-container-high/40 shadow-inner focus-within:ring-1 focus-within:ring-primary">
+<span class="font-terminal-input text-primary mr-2 font-bold select-none">&gt;_</span>
+<input autocomplete="off" class="w-full bg-transparent text-on-surface font-terminal-input text-xs sm:text-sm placeholder:text-outline focus:outline-none" id="mud-command-field" placeholder="Enter command (e.g. 'inspect brass watch', 'go north', 'take phial')..." type="text">
+</div>
+<button class="bg-gradient-to-r from-primary-container to-primary hover:from-primary hover:to-primary-fixed text-on-primary font-label-caps text-xs px-4 sm:px-5 py-2 rounded shadow-lg flex items-center gap-1.5 transition-transform active:translate-y-0.5 shrink-0 font-bold" type="submit">
+<span class="material-symbols-outlined text-sm">send</span>
+<span class="hidden sm:inline">Execute</span>
+</button>
+</form>
+</div>
+</div>
+<!-- 6. Interactive Close-Up Modal (Inspector Overlay) -->
+<div class="fixed inset-0 z-50 bg-background/80 backdrop-blur-md hidden items-center justify-center p-4" id="inspector-modal">
+<div class="bg-surface-container-low max-w-lg w-full rounded-xl p-5 shadow-2xl relative flex flex-col gap-4 border border-surface-container-high/40">
+<div class="flex items-start justify-between pb-2.5 border-b border-surface-container-high/30">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl" id="modal-icon">watch</span>
+<div class="flex flex-col">
+<h3 class="font-headline-sm text-base text-primary" id="modal-title">Item Inspection Ledger</h3>
+<span class="font-label-sm text-[10px] text-outline" id="modal-subtitle">Inquest Log</span>
+</div>
+</div>
+<button class="p-1 rounded text-outline hover:text-on-surface hover:bg-surface-container" onclick="closeInspector()" type="button">
+<span class="material-symbols-outlined text-lg">close</span>
+</button>
+</div>
+<div class="bg-surface-container-lowest p-3.5 rounded-lg flex flex-col gap-3 border border-surface-container-high/30 shadow-inner">
+<p class="font-body-md text-xs sm:text-sm text-on-surface leading-relaxed" id="modal-description">
+Victorian pocket watch fashioned of heavy brass. Strange celestial glyphs replace roman numerals.
+</p>
+<div class="grid grid-cols-3 gap-2 pt-1">
+<div class="flex flex-col bg-surface-container p-2 rounded">
+<span class="font-label-sm text-[9px] text-outline uppercase">Weight</span>
+<span class="font-terminal-input text-xs text-secondary font-bold" id="modal-weight">14.2 oz</span>
+</div>
+<div class="flex flex-col bg-surface-container p-2 rounded">
+<span class="font-label-sm text-[9px] text-outline uppercase">Resonance</span>
+<span class="font-terminal-input text-xs text-tertiary font-bold" id="modal-resonance">Tier III</span>
+</div>
+<div class="flex flex-col bg-surface-container p-2 rounded">
+<span class="font-label-sm text-[9px] text-outline uppercase">Appraisal</span>
+<span class="font-terminal-input text-xs text-primary font-bold" id="modal-value">18 Shillings</span>
+</div>
+</div>
+</div>
+<div class="flex items-center justify-end gap-2 pt-1">
+<button class="px-3 py-1.5 rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-caps text-[10px] uppercase transition-colors" onclick="closeInspector()" type="button">
+Close
+</button>
+<button class="px-3.5 py-1.5 rounded bg-primary hover:bg-primary-fixed text-on-primary font-label-caps text-[10px] uppercase transition-colors flex items-center gap-1 font-bold" id="modal-primary-btn" onclick="modalTakeAction()" type="button">
+<span class="material-symbols-outlined text-xs">inventory_2</span> Take Into Satchel
+</button>
+</div>
+</div>
+</div>
+<script>
+    const INSPECTION_DATA = {
+      watch: {
+        title: "Rune-Etched Brass Watch",
+        subtitle: "Aetheric Horology",
+        icon: "watch",
+        description: "The casing is etched with deep protective wards. Its hands tick backward, and a drop of glowing emerald mercury remains suspended in the escapement.",
+        weight: "12.8 oz",
+        resonance: "Tier IV",
+        value: "35s"
+      },
+      gazette: {
+        title: "London Gazette (Vol. LXIV)",
+        subtitle: "Broadsheet",
+        icon: "newspaper",
+        description: "The damp newsprint smudges against your thumb: 'RIVER SURGE SWALLOWS THIRD DOCK PATROL.' A cryptic verse is circled in grease pencil.",
+        weight: "2.1 oz",
+        resonance: "None",
+        value: "1d"
+      },
+      phial: {
+        title: "Apothecary's Cobalt Phial",
+        subtitle: "Chemical Specimen",
+        icon: "science",
+        description: "A dark cobalt flask. Vapors smell of wintergreen and battery acid. Useful for stabilizing aether flares or revealing occult ink.",
+        weight: "5.4 oz",
+        resonance: "Tier II",
+        value: "8s"
+      },
+      grate: {
+        title: "Padlocked Cistern Grate",
+        subtitle: "Drainage Access",
+        icon: "grid_goldenratio",
+        description: "Cast iron bars encrusted with sewer salt. Secured by a Bramah 4-slider lever padlock. Rushing water echoes below.",
+        weight: "Anchored",
+        resonance: "Null",
+        value: "N/A"
+      },
+      curiosity_shop: {
+        title: "Old Curiosity Shop",
+        subtitle: "Threshold",
+        icon: "storefront",
+        description: "Bow-fronted display windows choked with dust and stuffed birds. A tarnished brass pull-bell hangs motionless above the door.",
+        weight: "Structure",
+        resonance: "Tier III",
+        value: "N/A"
+      },
+      clocktower: {
+        title: "St. Jude's Clocktower",
+        subtitle: "Landmark",
+        icon: "schedule",
+        description: "Looming high through the soot, the golden clock face radiates through the mist.",
+        weight: "Landmark",
+        resonance: "Low",
+        value: "N/A"
+      }
+    };
+
+    let activeModalItem = null;
+
+    function openInspector(itemKey) {
+      const item = INSPECTION_DATA[itemKey];
+      if (!item) return;
+      activeModalItem = item;
+
+      document.getElementById('modal-icon').innerText = item.icon;
+      document.getElementById('modal-title').innerText = item.title;
+      document.getElementById('modal-subtitle').innerHTML = item.subtitle;
+      document.getElementById('modal-description').innerText = item.description;
+      document.getElementById('modal-weight').innerText = item.weight;
+      document.getElementById('modal-resonance').innerText = item.resonance;
+      document.getElementById('modal-value').innerText = item.value;
+
+      const primaryBtn = document.getElementById('modal-primary-btn');
+      if (item.weight === 'Anchored' || item.weight === 'Structure' || item.weight === 'Landmark') {
+        primaryBtn.style.display = 'none';
+      } else {
+        primaryBtn.style.display = 'flex';
+      }
+
+      const modal = document.getElementById('inspector-modal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      appendLog(`Inspecting [${item.title}].`);
+    }
+
+    function closeInspector() {
+      const modal = document.getElementById('inspector-modal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function examineObject(key) {
+      openInspector(key);
+    }
+
+    function pickupItem(itemName) {
+      appendLog(`Collected: [${itemName}]. Added to satchel.`);
+    }
+
+    function attemptPicklock() {
+      const roll = Math.floor(Math.random() * 20) + 1;
+      if (roll >= 14) {
+        appendLog(`Lockpick [${roll}]: SUCCESS. The Bramah padlock unlatches.`);
+      } else {
+        appendLog(`Lockpick [${roll}]: FAILED. The brass pick slips against the tumbler.`);
+      }
+    }
+
+    function executeMovement(direction) {
+      appendLog(`Movement: Heading [${direction.toUpperCase()}]...`);
+      if (direction === 'North') {
+        appendLog(`Proceeding toward St. Jude's Square.`);
+      } else if (direction === 'East') {
+        appendLog(`Approaching the Curiosity Shop door.`);
+      } else if (direction === 'Down') {
+        attemptPicklock();
+      } else {
+        appendLog(`Path to ${direction} is shrouded in dense pea-soup fog.`);
+      }
+    }
+
+    function insertCommand(cmd) {
+      const input = document.getElementById('mud-command-field');
+      input.value = cmd;
+      input.focus();
+    }
+
+    function handleMUDSubmit(e) {
+      e.preventDefault();
+      const input = document.getElementById('mud-command-field');
+      const val = input.value.trim();
+      if (!val) return;
+
+      appendLog(`> ${val}`);
+      processCommand(val.toLowerCase());
+      input.value = '';
+    }
+
+    function processCommand(cmd) {
+      if (cmd.includes('look')) {
+        appendLog(`Cobblestones glisten in gaslight. Heavy fog limits sight past 15 yards.`);
+      } else if (cmd.includes('watch')) {
+        openInspector('watch');
+      } else if (cmd.includes('gazette')) {
+        openInspector('gazette');
+      } else if (cmd.includes('phial')) {
+        openInspector('phial');
+      } else if (cmd.includes('grate') || cmd.includes('lock')) {
+        openInspector('grate');
+      } else if (cmd.includes('north') || cmd === 'n') {
+        executeMovement('North');
+      } else if (cmd.includes('south') || cmd === 's') {
+        executeMovement('South');
+      } else if (cmd.includes('east') || cmd === 'e') {
+        executeMovement('East');
+      } else if (cmd.includes('west') || cmd === 'w') {
+        executeMovement('West');
+      } else if (cmd.includes('listen')) {
+        appendLog(`Rhythmic mechanical churning vibrates beneath the sewer grate.`);
+      } else if (cmd.includes('inventory') || cmd === 'i') {
+        appendLog(`Satchel: Lantern (82%), Brass Picks, Inquest Log, Silver Needle.`);
+      } else if (cmd.includes('rest')) {
+        appendLog(`Paused under the lamp post. Sanity restored.`);
+      } else {
+        appendLog(`Unknown directive: "${cmd}".`);
+      }
+    }
+
+    function appendLog(text) {
+      const logContainer = document.getElementById('mud-chronicle-log');
+      const entry = document.createElement('div');
+      entry.className = "flex items-start gap-2 text-on-surface";
+      
+      const now = new Date();
+      const timeStr = `[${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}]`;
+      
+      entry.innerHTML = `<span class="text-outline-variant shrink-0 font-medium">${timeStr}</span><span>${text}</span>`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+
+    function modalTakeAction() {
+      if (activeModalItem) {
+        pickupItem(activeModalItem.title);
+        closeInspector();
+      }
+    }
+  </script>
+</div></main></div>
+
+
+
+
+</body></html>

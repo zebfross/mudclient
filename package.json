@@ -1,0 +1,29 @@
+{
+  "name": "mudclient",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "relay": "node server/relay.ts",
+    "build": "vite build",
+    "start": "npm run build && NODE_ENV=production node server/relay.ts",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --no-warnings test/ansi.test.ts && node --no-warnings test/store.test.ts && node --no-warnings test/objectives.test.ts && node --no-warnings test/replay.test.ts"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.2.1",
+    "tailwindcss": "^4.3.5",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
+  }
+}
