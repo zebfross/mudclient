@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Mapper } from '../web/src/lib/mapper.ts';
+import { Mapper, drawnPath } from '../web/src/lib/mapper.ts';
 
 const m = new Mapper();
 m.rooms.clear();
@@ -36,4 +36,27 @@ assert.equal(m.rooms.get(1)!.mark, '$');
 m.setMark(1, undefined);
 assert.equal(m.rooms.get(1)!.mark, undefined);
 assert.equal(m.setMark(999, '$'), false, 'unknown room');
+// Rooms only seen on Aardwolf's map stay on the area map, placed relative to where they were seen.
+const t = new Mapper();
+t.rooms.clear(); t.seen.clear();
+t.add({ num: 1, name: 'A', zone: 'z', terrain: 'city', details: '', exits: { e: 2 } });
+t.setSeen(1, [
+  { dx: 1, dy: 0, terrain: '..', exits: 'we', num: 2 },     // the known (unvisited) exit east: enriches the ghost
+  { dx: 2, dy: 0, terrain: '..', exits: 'ws', mark: '$' },  // beyond it, no id
+  { dx: 2, dy: 1, terrain: '(*', exits: 'n', ud: 'u' },
+  { dx: 0, dy: 0, terrain: '[]', exits: '' },               // clashes with the real room: ignored
+]);
+const l = t.areaLayout(1);
+const p = (x: number, y: number) => l.nodes.find((n) => n.x === x && n.y === y);
+assert.equal(l.nodes.length, 4);
+assert.equal(p(0, 0)!.num, 1);
+assert.equal(p(1, 0)!.num, 2);
+assert.equal(p(1, 0)!.seen?.terrain, '..', 'ghost exit picks up seen terrain');
+assert.ok(p(2, 0)!.num < 0 && p(2, 0)!.seen?.mark === '$', 'seen-only shop');
+assert.equal(p(2, 1)!.seen?.ud, 'u');
+const has = (a: number, b: number) => l.edges.some((e) => (e.from === a && e.to === b) || (e.from === b && e.to === a));
+assert.ok(has(1, 2) && has(2, p(2, 0)!.num) && has(p(2, 0)!.num, p(2, 1)!.num), 'drawn passages connect');
+assert.equal(t.setSeen(1, t.seen.get(1)!), false, 'unchanged');
+assert.deepEqual(drawnPath(l, 1, p(2, 1)!.num), ['e', 'e', 's'], 'walk to a seen-only room');
+assert.equal(drawnPath(l, 1, 12345), null);
 console.log('mapper tests passed');

@@ -2,8 +2,8 @@
 import { useSyncExternalStore } from 'react';
 import { AnsiParser, plain, type Seg } from './ansi.ts';
 import { aardSegs, stripAard } from './aardColor.ts';
-import { Mapper, type RoomInfo } from './mapper.ts';
-import { labelGrid, parseAsciiMap } from './asciiMap.ts';
+import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
+import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
@@ -220,7 +220,7 @@ export class Game {
       if (!this.state.loggedIn || !this.mapTagOn || this.captureQueue.some((q) => q.cmd === 'map')) return;
       this.captureReply('map', /^\s*<MAPSTART>/, (_text, segs) => {
         const { map, rest } = extractMap(segs);
-        if (map.length) this.set({ asciiMap: map });
+        if (map.length) { this.set({ asciiMap: map }); this.noteMapMarks(); }
         for (const l of rest) if (plain(l).trim()) this.print({ segs: l }); // anything that wasn't the map
       });
     }, delay);
@@ -470,17 +470,33 @@ export class Game {
     m.cb(m.lines);
   }
 
-  /** Remember shops and clan halls seen on Aardwolf's map, so the area map can show them later. */
+  /**
+   * Remember what Aardwolf's map showed: shops and clan halls on visited rooms, and every unvisited
+   * room (terrain, passages, shop) relative to where you stood, so the area map keeps them.
+   */
   private noteMapMarks() {
     const room = this.state.room;
     const grid = room && parseAsciiMap(this.state.asciiMap.map(plain));
     if (!room || !grid) return;
     let changed = false;
-    for (const [k, num] of labelGrid(grid, room, this.mapper)) {
-      const c = grid.byPos.get(k)!.contents;
-      if (LASTING.has(c)) changed = this.mapper.setMark(num, c) || changed;
-      else if (c === ' ') changed = this.mapper.setMark(num, undefined) || changed; // seen empty: it's gone
+    const ids = labelGrid(grid, room, this.mapper);
+    const seen: SeenCell[] = [];
+    for (const cell of grid.cells) {
+      const k = key(cell.x, cell.y);
+      const num = ids.get(k);
+      const c = cell.contents;
+      if (num !== undefined && this.mapper.rooms.has(num)) {
+        if (LASTING.has(c)) changed = this.mapper.setMark(num, c) || changed;
+        else if (c === ' ') changed = this.mapper.setMark(num, undefined) || changed; // seen empty: it's gone
+        continue;
+      }
+      const ud = `${cell.up ? 'u' : ''}${cell.down ? 'd' : ''}`;
+      seen.push({
+        dx: cell.x, dy: cell.y, terrain: cell.terrain, exits: Object.keys(cell.exits).join(''),
+        ...(num !== undefined ? { num } : {}), ...(LASTING.has(c) ? { mark: c } : {}), ...(ud ? { ud } : {}),
+      });
     }
+    changed = this.mapper.setSeen(room.num, seen) || changed;
     if (changed) this.set({ mapVersion: this.state.mapVersion + 1 });
   }
 

@@ -4,16 +4,11 @@ import { plain } from '../lib/ansi.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { gridPath, key, labelGrid, parseAsciiMap, type GridCell } from '../lib/asciiMap.ts';
 import { terrainIcon } from './ui.tsx';
-import { CONTENT_STYLE } from '../lib/mapStyle.ts';
+import { BRACKET_TERRAIN, CONTENT_STYLE } from '../lib/mapStyle.ts';
 
 const CELL = 40;
 const TILE = 30;
 
-// Bracket pairs from Aardwolf's map key → terrain names our icon picker understands.
-const BRACKET_TERRAIN: Record<string, string> = {
-  '[]': 'inside', ',`': 'field', '/\\': 'mountain', '~~': 'water', '..': 'city', '--': 'road',
-  ';;': 'hills', '%%': 'cave', '##': 'dungeon', '(*': 'forest', '**': 'shop',
-};
 const CONTENT_ICON: Record<string, [string, string]> = {
   '#': ['my_location', '#4d2600'],
   ...Object.fromEntries(Object.entries(CONTENT_STYLE).map(([c, v]) => [c, [v.icon, v.color] as [string, string]])),

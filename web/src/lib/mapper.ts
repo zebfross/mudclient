@@ -14,18 +14,51 @@ export interface RoomInfo {
 }
 
 const KEY = 'gaslamp.rooms.v1';
+const SEEN_KEY = 'gaslamp.seen.v1';
+
+/** A room seen on Aardwolf's map but never visited, stored relative to the room it was seen from. */
+export interface SeenCell {
+  dx: number;
+  dy: number;
+  terrain: string; // Aardwolf bracket pair, e.g. "[]", ".."
+  exits: string; // drawn passages, e.g. "ns"
+  num?: number; // room id, when it could be worked out from known exits
+  mark?: string; // '$' shop, '?' clan hall
+  ud?: string; // 'u' / 'd' / 'ud'
+}
+export type AreaNode = {
+  num: number; x: number; y: number; ghost: boolean; from?: number; dir?: string;
+  seen?: SeenCell; // set for rooms only known from Aardwolf's map
+};
 export const DIRS: Record<string, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
 export const DIR_NAMES: Record<string, string> = { n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down' };
 
 export class Mapper {
   rooms = new Map<number, RoomInfo>();
+  /** Unvisited rooms seen on Aardwolf's map, keyed by the visited room they were seen from. */
+  seen = new Map<number, SeenCell[]>();
   private saveTimer: ReturnType<typeof setTimeout> | undefined;
+  private seenTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     try {
       const raw = localStorage.getItem(KEY);
       if (raw) for (const r of JSON.parse(raw) as RoomInfo[]) this.rooms.set(r.num, { ...r, name: stripAard(r.name) }); // also cleans names saved before ANSI was stripped
+      const seen = localStorage.getItem(SEEN_KEY);
+      if (seen) this.seen = new Map(JSON.parse(seen));
     } catch { /* storage unavailable or corrupt: start fresh */ }
+  }
+
+  /** Replace what was seen from `anchor` with the latest map drawn there. */
+  setSeen(anchor: number, cells: SeenCell[]) {
+    const before = JSON.stringify(this.seen.get(anchor) ?? []);
+    if (before === JSON.stringify(cells)) return false;
+    if (cells.length) this.seen.set(anchor, cells); else this.seen.delete(anchor);
+    clearTimeout(this.seenTimer);
+    this.seenTimer = setTimeout(() => {
+      try { localStorage.setItem(SEEN_KEY, JSON.stringify([...this.seen])); } catch { /* quota */ }
+    }, 1000);
+    return true;
   }
 
   add(r: RoomInfo) {
@@ -96,7 +129,7 @@ export class Mapper {
    * are left out rather than drawn on top of each other.
    */
   areaLayout(center: number) {
-    type Node = { num: number; x: number; y: number; ghost: boolean; from?: number; dir?: string };
+    type Node = AreaNode;
     const nodes = new Map<string, Node>();
     const placed = new Map<number, [number, number]>();
     const edges: { from: number; to: number }[] = [];
@@ -130,6 +163,35 @@ export class Mapper {
         if (target) queue.push([to, nx, ny]);
       }
     }
+
+    // Fill in rooms only seen on Aardwolf's map, around each visited room they were seen from.
+    // Real rooms and known exits win any clash. Seen-only rooms get ids below zero.
+    let fake = -1;
+    const byPos = (x: number, y: number) => nodes.get(`${x},${y}`);
+    const added: [Node, SeenCell][] = [];
+    for (const n of [...nodes.values()]) {
+      if (n.ghost) continue;
+      for (const c of this.seen.get(n.num) ?? []) {
+        const x = n.x + c.dx, y = n.y + c.dy;
+        const there = byPos(x, y);
+        if (there) {
+          // Same room as a ghost exit: keep the extra detail (terrain, shop).
+          if (there.ghost && !there.seen && (c.num === undefined || c.num === there.num)) { there.seen = c; added.push([there, c]); }
+          continue;
+        }
+        const node: Node = { num: c.num !== undefined && !placed.has(c.num) ? c.num : fake--, x, y, ghost: true, seen: c };
+        placed.set(node.num, [x, y]);
+        nodes.set(`${x},${y}`, node);
+        added.push([node, c]);
+      }
+    }
+    for (const [node, c] of added) {
+      for (const d of c.exits) {
+        const off = DIRS[d];
+        const other = off && byPos(node.x + off[0], node.y + off[1]);
+        if (other) edge(node.num, other.num);
+      }
+    }
     return { nodes: [...nodes.values()], edges, zone: start.zone };
   }
 
@@ -155,4 +217,34 @@ export class Mapper {
     }
     return null;
   }
+}
+
+/** Directions from one node to another along the drawn connections (for rooms you haven't visited). */
+export function drawnPath(layout: { nodes: AreaNode[]; edges: { from: number; to: number }[] }, from: number, to: number): string[] | null {
+  const at = new Map(layout.nodes.map((n) => [n.num, n]));
+  const adj = new Map<number, number[]>();
+  for (const e of layout.edges) {
+    adj.set(e.from, [...(adj.get(e.from) ?? []), e.to]);
+    adj.set(e.to, [...(adj.get(e.to) ?? []), e.from]);
+  }
+  const prev = new Map<number, number>();
+  const queue = [from];
+  const seen = new Set([from]);
+  while (queue.length) {
+    const cur = queue.shift()!;
+    if (cur === to) break;
+    for (const nxt of adj.get(cur) ?? []) {
+      if (seen.has(nxt)) continue;
+      seen.add(nxt); prev.set(nxt, cur); queue.push(nxt);
+    }
+  }
+  if (!prev.has(to)) return null;
+  const dirs: string[] = [];
+  for (let n = to; n !== from; n = prev.get(n)!) {
+    const a = at.get(prev.get(n)!)!, b = at.get(n)!;
+    const dir = Object.entries(DIRS).find(([, [dx, dy]]) => dx === b.x - a.x && dy === b.y - a.y)?.[0];
+    if (!dir) return null;
+    dirs.unshift(dir);
+  }
+  return dirs;
 }

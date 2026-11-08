@@ -7,3 +7,9 @@ export const CONTENT_STYLE: Record<string, { icon: string; color: string; label:
 };
 /** Features that stay put, so they're remembered per room. Mobs and players are live only. */
 export const LASTING = new Set(['$', '?']);
+
+// Bracket pairs from Aardwolf's map key → terrain names the icon picker understands.
+export const BRACKET_TERRAIN: Record<string, string> = {
+  '[]': 'inside', ',`': 'field', '/\\': 'mountain', '~~': 'water', '..': 'city', '--': 'road',
+  ';;': 'hills', '%%': 'cave', '##': 'dungeon', '(*': 'forest', '**': 'shop',
+};

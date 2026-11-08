@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
-import { DIRS, DIR_NAMES } from '../lib/mapper.ts';
+import { DIRS, DIR_NAMES, drawnPath } from '../lib/mapper.ts';
 import { Icon, terrainIcon } from './ui.tsx';
 import { plain } from '../lib/ansi.ts';
 import { labelGrid, parseAsciiMap } from '../lib/asciiMap.ts';
-import { CONTENT_STYLE } from '../lib/mapStyle.ts';
+import { BRACKET_TERRAIN, CONTENT_STYLE } from '../lib/mapStyle.ts';
 
 const CELL = 64; // world units between room centres
 const TILE = 36;
@@ -95,10 +95,9 @@ export function AreaMap() {
   });
 
   const walkTo = (num: number) => {
-    if (suppressClick.current || !room || num === room.num) return;
-    const n = pos.get(num);
-    let path = n?.ghost ? (n.from !== undefined ? map.path(room.num, n.from) : null) : map.path(room.num, num);
-    if (path && n?.ghost && n.dir) path = [...path, n.dir];
+    if (suppressClick.current || !room || num === room.num || !layout) return;
+    // Visited rooms: known exits (including up/down). Anything else: along the lines drawn here.
+    const path = map.rooms.has(num) ? map.path(room.num, num) : drawnPath(layout, room.num, num);
     if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
   };
 
@@ -176,9 +175,10 @@ export function AreaMap() {
               {nodes.map((n) => {
                 const r = map.rooms.get(n.num);
                 const here = n.num === room.num;
-                const vertical = r ? ['u', 'd'].filter((d) => d in r.exits).join('') : '';
-                const what = CONTENT_STYLE[live.get(n.num) ?? ''] ?? CONTENT_STYLE[r?.mark ?? ''];
-                const name = r?.name ?? `Unexplored (${DIR_NAMES[n.dir ?? ''] ?? '?'} of ${map.rooms.get(n.from ?? -1)?.name ?? '?'})`;
+                const vertical = r ? ['u', 'd'].filter((d) => d in r.exits).join('') : n.seen?.ud ?? '';
+                const what = CONTENT_STYLE[live.get(n.num) ?? ''] ?? CONTENT_STYLE[r?.mark ?? n.seen?.mark ?? ''];
+                const terrain = r?.terrain ?? BRACKET_TERRAIN[n.seen?.terrain ?? ''];
+                const name = r?.name ?? (n.seen && n.from === undefined ? 'Seen on the map, not visited' : `Unexplored (${DIR_NAMES[n.dir ?? ''] ?? '?'} of ${map.rooms.get(n.from ?? -1)?.name ?? '?'})`);
                 return (
                   <g key={n.num} transform={`translate(${n.x * CELL - TILE / 2},${n.y * CELL - TILE / 2})`}
                     onClick={() => walkTo(n.num)} className={here ? '' : 'cursor-pointer [&:hover>rect]:stroke-[#ffb77d]'}>
@@ -187,10 +187,10 @@ export function AreaMap() {
                       fill={here ? '#ffb77d' : n.ghost ? 'rgba(43,42,40,0.35)' : '#2b2a28'}
                       stroke={here ? '#ffdcc3' : n.ghost ? '#6d5a4c' : '#4a4542'}
                       strokeWidth={here ? 2.5 : 1.25} strokeDasharray={n.ghost ? '3 3' : undefined} />
-                    {(!n.ghost || what) && (
+                    {(!n.ghost || what || terrain) && (
                       <text x={TILE / 2} y={TILE / 2 + 1} textAnchor="middle" dominantBaseline="central" className="msi" fontSize={20}
-                        fill={here ? '#4d2600' : what?.color ?? '#cfc6bd'}>
-                        {here ? 'my_location' : what?.icon ?? terrainIcon(r?.terrain ?? '')}
+                        fill={here ? '#4d2600' : what?.color ?? (n.ghost ? '#6d5a4c' : '#cfc6bd')}>
+                        {here ? 'my_location' : what?.icon ?? terrainIcon(terrain ?? '')}
                       </text>
                     )}
                     {vertical && (
@@ -211,3 +211,4 @@ export function AreaMap() {
     </div>
   );
 }
+
