@@ -73,6 +73,16 @@ function setup() {
   assert.deepEqual(cmds(), ['Typoname'], 'password not sent, nothing answered');
   assert.equal(g.state.login.stage, 'error');
 }
+// Aardwolf's real re-ask (seen live): "That name is not usable. Please try another." then "Name: ".
+{
+  const { g, cmds } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.onMessage({ t: 'text', d: 'That name is not usable. Please try another.\r\nName: ' });
+  await tick(300);
+  g.signIn('Testchar', 'pw');
+  assert.deepEqual(cmds(), ['Testchar'], 'the real Name: prompt is recognised');
+}
+
 // A server that sends GA after game prompts but not after the name question (the fake MUD).
 {
   const { g, cmds } = setup();

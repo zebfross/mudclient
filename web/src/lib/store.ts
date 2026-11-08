@@ -173,10 +173,13 @@ export class Game {
   resume() {
     this.set({ connected: true, status: 'Connected' });
     this.sys('— Reattached to your session.');
+    // If you're in the game, the character data that comes back logs us in and we look around.
+    // (At Aardwolf's login screen a 'look' would be taken as a character name.)
+    this.lookAfterLogin = true;
     this.gmcp('request char');
     this.gmcp('request room');
-    this.command('look');
   }
+  private lookAfterLogin = false;
   disconnect() { this.sendRaw({ t: 'disconnect' }); }
 
   command(cmd: string) {
@@ -748,6 +751,7 @@ export class Game {
 
   private onLogin() {
     this.set({ loggedIn: true });
+    if (this.lookAfterLogin) { this.lookAfterLogin = false; this.command('look'); }
     this.atNamePrompt = false;
     if (this.pendingLogin) { clearTimeout(this.pendingLogin.timer); this.pendingLogin = null; }
     if (this.state.login.stage !== 'idle') this.set({ login: { stage: 'idle' } });
