@@ -18,7 +18,7 @@ const CONTENT_ICON: Record<string, [string, string]> = {
 };
 
 /** Aardwolf's map, parsed into walkable tiles; known rooms are named, the rest are ghosts. */
-export function GridMap({ big = false }: { big?: boolean }) {
+export function GridMap() {
   const { asciiMap, room, mapVersion } = useGame();
   const grid = useMemo(() => parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
   const ids = useMemo(() => (grid && room ? labelGrid(grid, room, game.mapper) : new Map<string, number>()), [grid, room, mapVersion]);
@@ -37,9 +37,7 @@ export function GridMap({ big = false }: { big?: boolean }) {
   };
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} width={big ? undefined : w}
-      // Expanded: scale to fill the overlay, but never blow tiles up past ~2.5×.
-      style={big ? { width: '100%', height: '100%', maxWidth: w * 2.5, maxHeight: h * 2.5 } : { maxWidth: '100%', maxHeight: 340 }} role="img" aria-label="Map of nearby rooms">
+    <svg viewBox={`0 0 ${w} ${h}`} width={w} style={{ maxWidth: '100%', maxHeight: 340 }} role="img" aria-label="Map of nearby rooms">
       {grid.cells.flatMap((c) => (['e', 's'] as const).filter((d) => c.exits[d]).map((d) => {
         const nx = c.x + (d === 'e' ? 1 : 0), ny = c.y + (d === 's' ? 1 : 0);
         return <line key={`${c.x},${c.y},${d}`} x1={cx(c)} y1={cy(c)} x2={cx({ x: nx })} y2={cy({ y: ny })} stroke="#6d5a4c" strokeWidth={2.5} strokeLinecap="round" />;

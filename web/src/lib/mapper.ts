@@ -73,6 +73,50 @@ export class Mapper {
     return { nodes: [...nodes.values()], edges, stubs };
   }
 
+  /**
+   * Every known room in `center`'s zone, placed on a grid by walking compass exits outward from
+   * `center`. Exits to rooms never visited become ghost nodes, so the edge of what you've explored
+   * shows. Rooms that would land on an occupied square (Aardwolf areas aren't always Euclidean)
+   * are left out rather than drawn on top of each other.
+   */
+  areaLayout(center: number) {
+    type Node = { num: number; x: number; y: number; ghost: boolean; from?: number; dir?: string };
+    const nodes = new Map<string, Node>();
+    const placed = new Map<number, [number, number]>();
+    const edges: { from: number; to: number }[] = [];
+    const seenEdge = new Set<string>();
+    const edge = (a: number, b: number) => {
+      const k = a < b ? `${a}-${b}` : `${b}-${a}`;
+      if (!seenEdge.has(k)) { seenEdge.add(k); edges.push({ from: a, to: b }); }
+    };
+    const start = this.rooms.get(center);
+    if (!start) return { nodes: [] as Node[], edges, zone: '' };
+    placed.set(center, [0, 0]);
+    nodes.set('0,0', { num: center, x: 0, y: 0, ghost: false });
+    const queue: [number, number, number][] = [[center, 0, 0]];
+    while (queue.length) {
+      const [num, x, y] = queue.shift()!;
+      for (const [dir, to] of Object.entries(this.rooms.get(num)!.exits)) {
+        const off = DIRS[dir];
+        if (!off) continue;
+        const nx = x + off[0], ny = y + off[1];
+        const target = this.rooms.get(to);
+        if (target && target.zone !== start.zone) continue;
+        const at = placed.get(to);
+        if (at) {
+          if (at[0] === nx && at[1] === ny) edge(num, to);
+          continue;
+        }
+        if (nodes.has(`${nx},${ny}`)) continue;
+        placed.set(to, [nx, ny]);
+        nodes.set(`${nx},${ny}`, { num: to, x: nx, y: ny, ghost: !target, from: num, dir });
+        edge(num, to);
+        if (target) queue.push([to, nx, ny]);
+      }
+    }
+    return { nodes: [...nodes.values()], edges, zone: start.zone };
+  }
+
   /** Shortest list of direction letters from one room to another over known exits. */
   path(from: number, to: number): string[] | null {
     if (from === to) return [];

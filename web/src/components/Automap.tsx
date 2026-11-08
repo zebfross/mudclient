@@ -4,11 +4,11 @@ import { game, useGame } from '../lib/store.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { CardHead, Empty, Icon, SegText, terrainIcon } from './ui.tsx';
 import { GridMap } from './GridMap.tsx';
+import { AreaMap } from './AreaMap.tsx';
 import { parseAsciiMap } from '../lib/asciiMap.ts';
 import { plain } from '../lib/ansi.ts';
 
-const R_SMALL = 3;     // grid radius in rooms
-const R_BIG = 6;       // radius in the expanded view
+const R = 3;           // grid radius in rooms
 const CELL = 40;       // px per grid step
 const TILE = 32;       // px tile size
 const DIR_VEC: Record<string, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
@@ -45,9 +45,9 @@ export function Automap() {
                 <Icon name="refresh" className="text-base" />
               </button>
             )}
-            <button onClick={() => setExpanded(!expanded)} title={expanded ? 'Close large map (Esc)' : 'Expand map'} aria-label={expanded ? 'Close large map' : 'Expand map'}
-              className={`p-1 rounded border ${expanded ? 'bg-primary/20 text-primary border-primary/40' : 'text-outline border-surface-high/40 hover:text-on-surface'}`}>
-              <Icon name={expanded ? 'close_fullscreen' : 'open_in_full'} className="text-base" />
+            <button onClick={() => setExpanded(true)} title="Area map: everything you've explored here" aria-label="Expand map"
+              className="p-1 rounded border text-outline border-surface-high/40 hover:text-on-surface">
+              <Icon name="open_in_full" className="text-base" />
             </button>
     </div>
   );
@@ -62,8 +62,11 @@ export function Automap() {
       {expanded && createPortal(
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-3 sm:p-6 flex" onMouseDown={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}>
           <section className="card p-4 flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full" role="dialog" aria-label="Large map">
-            <CardHead icon="explore" title={room?.name ?? 'Automap'} right={controls} />
-            <MapFrame mode={mode} big />
+            <CardHead icon="map" title={`Area map${room?.zone ? ` · ${room.zone}` : ''}`} right={
+              <button onClick={() => setExpanded(false)} title="Close (Esc)" aria-label="Close large map"
+                className="p-1 rounded border bg-primary/20 text-primary border-primary/40"><Icon name="close_fullscreen" className="text-base" /></button>
+            } />
+            <AreaMap />
           </section>
         </div>,
         document.body,
@@ -72,12 +75,11 @@ export function Automap() {
   );
 }
 
-function MapFrame({ mode, big = false }: { mode: Mode; big?: boolean }) {
+function MapFrame({ mode }: { mode: Mode }) {
   const { room, mapVersion, asciiMap, loggedIn } = useGame();
   const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
   const map = game.mapper;
-  const R = big ? R_BIG : R_SMALL;
-  const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion, R]);
+  const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion]);
   const size = (R * 2 + 1) * CELL;
   const px = (v: number) => (v + R) * CELL + CELL / 2;
 
@@ -88,22 +90,22 @@ function MapFrame({ mode, big = false }: { mode: Mode; big?: boolean }) {
   };
 
   return (
-      <div className={`rounded-lg border border-surface-high/40 bg-surface-lowest/80 shadow-inner p-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] items-center justify-items-center gap-1 ${big ? 'flex-1 min-h-0 mt-1' : ''}`}>
+      <div className="rounded-lg border border-surface-high/40 bg-surface-lowest/80 shadow-inner p-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] items-center justify-items-center gap-1">
         <span />
         <DirButton dir="n" />
         <DirButton dir="u" />
         <DirButton dir="w" />
-        <div className={`w-full min-w-0 flex justify-center items-center overflow-auto scroll-thin py-1 ${big ? 'h-full' : ''}`}>
+        <div className="w-full min-w-0 flex justify-center items-center overflow-auto scroll-thin py-1">
           {mode === 'aard' ? (
             asciiMap.length === 0 ? (
               <Empty>{loggedIn ? 'Drawing the map…' : "Aardwolf's map of your surroundings appears here."}</Empty>
             ) : (
-              <pre className={`font-mono leading-[1.2] text-[#cfc6bd] select-text ${big ? 'text-[clamp(14px,3.2vh,30px)]' : 'text-[12px]'}`}>
+              <pre className="font-mono text-[12px] leading-[1.2] text-[#cfc6bd] select-text">
                 {asciiMap.map((l, i) => <div key={i} className="min-h-[1lh]"><SegText segs={l} /></div>)}
               </pre>
             )
           ) : hasGrid ? (
-            <GridMap big={big} />
+            <GridMap />
           ) : !layout || layout.nodes.length === 0 ? (
             <Empty>The map fills in as you walk. Rooms are remembered in this browser.</Empty>
           ) : (
