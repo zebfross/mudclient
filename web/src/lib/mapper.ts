@@ -22,7 +22,7 @@ export class Mapper {
   constructor() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (raw) for (const r of JSON.parse(raw) as RoomInfo[]) this.rooms.set(r.num, r);
+      if (raw) for (const r of JSON.parse(raw) as RoomInfo[]) this.rooms.set(r.num, { ...r, name: stripAard(r.name) }); // also cleans names saved before ANSI was stripped
     } catch { /* storage unavailable or corrupt: start fresh */ }
   }
 

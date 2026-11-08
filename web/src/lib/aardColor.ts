@@ -29,4 +29,5 @@ export function aardSegs(s: string): Seg[] {
   return out;
 }
 
-export const stripAard = (s: string) => aardSegs(s).map((x) => x.text).join('');
+/** Plain text: drops Aardwolf @-codes and any raw ANSI escapes (GMCP strings can carry both). */
+export const stripAard = (s: string) => aardSegs(s.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '')).map((x) => x.text).join('');

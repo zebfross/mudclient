@@ -1,3 +1,4 @@
+import { stripAard } from '../web/src/lib/aardColor.ts';
 import assert from 'node:assert/strict';
 import { AnsiParser } from '../web/src/lib/ansi.ts';
 import { guessTarget } from '../web/src/lib/roomText.ts';
@@ -20,4 +21,5 @@ assert.equal(kw('(Player) Fennic the Shaman.'), 'fennic');
 assert.equal(kw('A glass of milk sits on the bar.'), 'milk');
 assert.equal(kw('A large rat is here, sniffing.'), 'rat');
 assert.equal(kw('A wise old owl watches you closely.'), 'owl');
+assert.equal(stripAard('\x1b[1;35mNews Stand\x1b[0;37m @Rred@w'), 'News Stand red', 'GMCP room names carry raw ANSI');
 console.log('ansi tests passed');
