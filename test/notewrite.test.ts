@@ -34,12 +34,33 @@ function setup() {
   assert.deepEqual(sent.slice(2), ['Directions']);
   await tick(700);
   assert.deepEqual(sent.slice(3), ['.s'], 'checks the editor before any body text');
-  say('\r\nTo      : Finch\r\nSubject : Directions\r\n');
+  // Aardwolf's real preview (the subject rides on the From line).
+  say('~~~~~~~~\r\nFrom    : Finch: Directions\r\nForum   : Personal\r\nTo      : Finch\r\nDate    : Sun Nov  8 15:11:07 2026\r\n~~~~~~~~\r\nYou haven\'t written anything yet....\r\n\r\n');
   await tick();
   assert.deepEqual(sent.slice(4), ['From recall: run u3n', ' .q is not a command here', '.p']);
   assert.equal(g.state.notes.compose?.stage, 'posting');
   say('Note posted to Personal.\r\n> ');
   await tick();
+  assert.equal(g.state.notes.compose?.stage, 'posted');
+}
+
+// No recognisable confirmation: the post is looked for on the board instead.
+{
+  const { g, sent, say } = setup();
+  g.writeNote({ to: 'Finch', subject: 'Goals', body: 'Level 10' });
+  say('Current forum changed to Personal.\r\n> ');
+  await tick(250);
+  say('Subject :  ');
+  await tick(700);
+  say('From    : Finch: Goals\r\n');
+  await tick();
+  assert.equal(sent.at(-1), '.p');
+  say('Something unexpected.\r\n> ');
+  await tick(2600);
+  assert.equal(sent.at(-1), 'note list');
+  say('Posts in the Personal forum:\r\n');
+  say('|  2|Nov 08 2026|Finch       |Goals                      |  0 |\r\n> ');
+  await tick(300);
   assert.equal(g.state.notes.compose?.stage, 'posted');
 }
 

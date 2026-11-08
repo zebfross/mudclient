@@ -534,14 +534,18 @@ export class Game {
         this.noteFailed(`Aardwolf said: ${text.trim()}`);
       }
     } else if (w.stage === 'checking') {
-      const m = /^\s*subject\s*:\s*(.*)$/i.exec(text);
-      if (m && m[1].trim().toLowerCase().startsWith(w.subject.slice(0, 20).toLowerCase())) {
+      // Aardwolf's preview puts the subject on the From line ("From    : Name: Subject"); other
+      // servers have a Subject line. Either way only the editor echoes our subject back like this.
+      const m = /^\s*(?:from|subject)\s*:\s*(.*)$/i.exec(text);
+      if (m && m[1].toLowerCase().includes(w.subject.slice(0, 20).toLowerCase())) {
         w.stage = 'posting';
         this.patchNotes({ compose: { stage: 'body' } });
         for (const l of w.body) this.sendRaw({ t: 'cmd', d: l });
         this.sendRaw({ t: 'cmd', d: '.p' });
         this.patchNotes({ compose: { stage: 'posting' } });
-        this.writerTimeout(10000);
+        // Aardwolf's confirmation wording isn't known, so if none is recognised, look for the post.
+        clearTimeout(w.timer);
+        w.timer = setTimeout(() => { if (this.writer === w) this.confirmPosted(w.subject); }, 2500);
       } else if (/huh\?|not (?:writing|in) a note|isn't a command|unknown command/i.test(text)) {
         this.noteFailed('The note editor didn’t open, so the note wasn’t sent.');
       }
@@ -555,6 +559,21 @@ export class Game {
       }
     }
   }
+  /** Check the Personal board for the note we just posted. */
+  private confirmPosted(subject: string) {
+    this.writer = null;
+    this.nextCapture();
+    this.captureReply('note list', /^\s*(Posts in the|There are no|No posts|You have no)/i, (lines) => {
+      const { posts } = parseNoteList(lines);
+      // The list may shorten long subjects.
+      const want = subject.toLowerCase();
+      const found = posts.some((p) => { const got = p.subject.trim().toLowerCase().replace(/\.{2,}$/, ''); return !!got && want.startsWith(got); });
+      this.patchNotes(found
+        ? { compose: { stage: 'posted' }, posts: posts.slice(-40).reverse(), current: 'Personal', forum: 'Personal', at: Date.now() }
+        : { compose: { stage: 'error', error: 'The note doesn’t show on your Personal board. Check the log: if you’re still in the note editor, type .q to cancel it.' } });
+    });
+  }
+
   cancelNoteWrite() {
     const w = this.writer;
     if (w && w.stage !== 'to') this.sendRaw({ t: 'cmd', d: '.q' });
