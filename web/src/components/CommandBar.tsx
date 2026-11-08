@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
 import { Icon } from './ui.tsx';
+import { QuickBar } from './QuickBar.tsx';
 import { searchHistory } from '../lib/history.ts';
 
-const QUICK = ['look', 'score', 'where', 'quest info', 'campaign check', 'affects', 'scan', 'recall'];
 const HISTORY_KEY = 'gaslamp.history.v1';
 
 function loadHistory(): string[] {
@@ -117,13 +117,7 @@ export function CommandBar() {
 
   return (
     <div className="sticky bottom-3 z-40 backdrop-blur-md rounded-xl p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.85)] border border-surface-high/40 flex flex-col gap-2 bg-surface-lowest/80">
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scroll-thin">
-        <span className="label-caps text-outline shrink-0 mr-1">Quick:</span>
-        {QUICK.map((q) => (
-          <button key={q} className="bg-surface-mid hover:bg-surface-bright hover:text-primary px-2.5 py-1 rounded font-mono text-[11px] uppercase shrink-0 border border-surface-high/20 text-on-surface-variant"
-            onClick={() => game.command(q)} disabled={!connected}>{q}</button>
-        ))}
-      </div>
+      <QuickBar />
       {search && (
         <div className="rounded border border-surface-high/40 bg-surface-low/95 p-1.5">
           <div className="flex items-center justify-between px-1.5 pb-1">
