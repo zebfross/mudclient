@@ -92,6 +92,21 @@ function setup() {
   assert.equal(g.state.login.stage, 'idle');
 }
 
+// Sign in before the banner arrives (reconnecting): the banner's "Enter your character name" line
+// is not the question; only "What be thy name, adventurer?" is. (Real banner, 2026-11-08.)
+{
+  const { g, cmds } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.signIn('Testchar', 'pw');
+  g.onMessage({ t: 'text', d: "-----------------------------------------------------------------------------\n\r    Enter your character name or type 'NEW' to create a new character\n\r-----------------------------------------------------------------------------\n\r" });
+  await tick();
+  assert.deepEqual(cmds(), [], 'banner line ignored');
+  g.onMessage({ t: 'text', d: 'What be thy name, adventurer? ' });
+  await tick(300);
+  assert.deepEqual(cmds(), ['Testchar']);
+  assert.equal(g.state.login.stage, 'name', 'no "asked again" error');
+}
+
 // Aardwolf's real re-ask (seen live): "That name is not usable. Please try another." then "Name: ".
 {
   const { g, cmds } = setup();
@@ -113,6 +128,64 @@ function setup() {
   g.onMessage({ t: 'text', d: '\r\nPassword: ' });
   await tick();
   assert.equal(g.state.login.stage, 'name', 'the same question finishing its line is not a second ask');
+}
+// Page load: the relay says the old session is gone, so the client connects; signing in right
+// away mustn't open a second connection (that would drop the first).
+{
+  const { g, sent } = setup();
+  g.onSession(false);
+  g.signIn('Testchar', 'pw');
+  assert.equal(sent.filter((m) => m.t === 'connect').length, 1, 'one connection');
+  assert.ok(g.state.sessionAt > 0);
+}
+// Pressing Disconnect cancels a sign-in and marks the drop as yours; connecting again clears it.
+{
+  const { g } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.signIn('Testchar', 'pw');
+  g.disconnect();
+  assert.equal(g.state.manualDisconnect, true);
+  assert.equal(g.state.login.stage, 'idle');
+  g.connect();
+  assert.equal(g.state.manualDisconnect, false);
+}
+// Reattached to a session already at the name prompt (the prompt arrived before this page): reconnect.
+{
+  const { g, sent, cmds } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.signIn('Testchar', 'pw');
+  await tick(2100);
+  assert.equal(sent.filter((m) => m.t === 'connect').length, 1, 'asks for a fresh connection');
+  g.onMessage({ t: 'status', connected: true });
+  g.onMessage({ t: 'text', d: 'What be thy name, adventurer? ' });
+  assert.deepEqual(cmds(), ['Testchar']);
+}
+// The game can't be reached while signing in: a retryable error, not a 30-second hang.
+{
+  const { g } = setup();
+  g.signIn('Testchar', 'pw');
+  g.onMessage({ t: 'status', connected: false, msg: 'Connecting to aardmud.org:4000…' }); // the relay's attempt notice
+  assert.equal(g.state.login.stage, 'waiting', 'an attempt in progress is not a failure');
+  g.onMessage({ t: 'status', connected: false, msg: 'connect ECONNREFUSED 127.0.0.1:4000' });
+  assert.equal(g.state.login.stage, 'error');
+  assert.equal(g.state.login.retry, true);
+  assert.match(g.state.login.error ?? '', /ECONNREFUSED/);
+}
+// Background lookups queued before a drop are forgotten, not sent to the next login screen.
+{
+  const { g, cmds } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.onMessage({ t: 'gmcp', pkg: 'char.base', data: { name: 'Testchar' } }); // logged in
+  g.state = { ...g.state, loggedIn: true };
+  g.refreshObjectives(); // queues campaign check, goals… (nothing answers here)
+  const before = cmds().length;
+  g.onMessage({ t: 'status', connected: false, msg: 'read ETIMEDOUT' });
+  g.refreshInventory();
+  await tick();
+  g.onMessage({ t: 'status', connected: true });
+  g.signIn('Testchar', 'pw');
+  g.onMessage({ t: 'text', d: 'What be thy name, adventurer? ' });
+  assert.deepEqual(cmds().slice(before), ['Testchar'], 'only the name goes to the login screen');
 }
 console.log('login tests passed');
 process.exit(0);

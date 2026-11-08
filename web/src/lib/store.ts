@@ -21,11 +21,13 @@ export interface NotesState {
 }
 const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: [], open: null, loading: false, at: 0 });
 // e.g. Aaeron says, "I have sent a personal note to you…" / "A new note has been posted…"
-export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string }
+export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string; retry?: boolean }
 // Aardwolf's wording isn't documented here, so these are deliberately broad.
-const NAME_PROMPT_RE = /what be thy name|what is your name|enter (?:your )?(?:character )?name|by what name|^\s*name\s*:\s*$/i;
+// The question itself, not the banner line above it ("Enter your character name or type 'NEW'…").
+const NAME_PROMPT_RE = /(?:what be thy name|what is your name|by what name)[^?]*\?\s*$|^\s*name\s*:\s*$/i;
 const WRONG_PASSWORD_RE = /wrong password|incorrect password|password (?:is )?incorrect|invalid password/i;
-const NEW_CHAR_RE = /did i get that right|is that (?:right|correct)\?|create (?:a )?new character|no such (?:player|character)/i;
+// Only checked after the name was sent: the login banner itself mentions creating a new character.
+const NEW_CHAR_RE = /did i get that right|is that (?:right|correct)\?|no such (?:player|character)/i;
 const PRESS_RETURN_RE = /press (?:return|enter)|\[\s*(?:return|enter)\s*\]|hit (?:return|enter)/i;
 const NEW_NOTE_RE = /\b(sent|posted|left|written)\b.*\bnote\b|\bnew (personal )?(note|post)s?\b/i;
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
@@ -45,6 +47,8 @@ export interface State {
   localEcho: boolean;
   loggedIn: boolean;
   login: LoginState;
+  sessionAt: number; // when the relay told us whether this tab's MUD session survived
+  manualDisconnect: boolean; // you pressed Disconnect: don't log back in by yourself
   lines: Line[];
   partial: Seg[];
   char: {
@@ -109,7 +113,7 @@ function stripPrefix(segs: Seg[], n: number): Seg[] {
 
 export class Game {
   state: State = {
-    connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' },
+    connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
     inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
@@ -167,7 +171,19 @@ export class Game {
   sys(text: string) { this.print({ segs: [{ text, fg: '#a38c7c' }], kind: 'sys' }); }
 
   // ---- outbound -------------------------------------------------------------
-  connect() { this.sendRaw({ t: 'connect' }); }
+  connect() {
+    this.connecting = true;
+    if (this.state.manualDisconnect) this.set({ manualDisconnect: false });
+    this.sendRaw({ t: 'connect' });
+  }
+  private connecting = false;
+
+  /** The relay's answer to hello: reattach to a live session, or open a new one. */
+  onSession(resumed: boolean) {
+    this.gameDown = false;
+    this.set({ sessionAt: Date.now() });
+    if (resumed) this.resume(); else this.connect();
+  }
 
   /** Reattached to a live MUD session after a page reload: rebuild state from the server. */
   resume() {
@@ -180,7 +196,7 @@ export class Game {
     this.gmcp('request room');
   }
   private lookAfterLogin = false;
-  disconnect() { this.sendRaw({ t: 'disconnect' }); }
+  disconnect() { this.set({ manualDisconnect: true }); this.cancelSignIn(); this.sendRaw({ t: 'disconnect' }); }
 
   command(cmd: string) {
     if (this.state.death && /^get all corpse\b/i.test(cmd.trim())) this.set({ death: null });
@@ -201,6 +217,7 @@ export class Game {
 
   /** Send a command whose next prompt should not be shown. */
   private hidden(cmd: string) {
+    if (this.gameDown) return;
     if (Date.now() > this.suppressPromptsUntil) this.suppressPrompts = 0;
     this.suppressPrompts++;
     this.suppressPromptsUntil = Date.now() + 3000;
@@ -216,7 +233,23 @@ export class Game {
    * Send `cmd` quietly and hand its reply to `cb`. The reply starts at a line matching `start` and
    * ends at the next prompt, or at a line matching `end` for replies Aardwolf sends without one.
    */
+  /**
+   * The game connection is gone: forget queued background lookups. Sent on a new connection, the
+   * first of them would land on the login screen and be taken as a character name.
+   */
+  private gameDown = false; // the relay told us the game connection closed (and no new one yet)
+  private dropBackgroundWork() {
+    if (this.capture) { clearTimeout(this.capture.timer); this.capture = null; }
+    this.captureQueue = [];
+    this.suppressPrompts = 0;
+    this.detailsPending.clear();
+    clearTimeout(this.invTimer); clearTimeout(this.mapTimer); clearTimeout(this.notesTimer);
+    if (this.state.objectives.loading) this.set({ objectives: { ...this.state.objectives, loading: false } });
+    if (this.state.notes.loading) this.set({ notes: { ...this.state.notes, loading: false } });
+  }
+
   private captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
+    if (this.gameDown) return; // nothing to ask; it would be sent to whatever connects next
     this.captureQueue.push({ cmd, start, end, cb });
     if (!this.capture) this.nextCapture();
   }
@@ -297,15 +330,22 @@ export class Game {
     if (this.pendingLogin) clearTimeout(this.pendingLogin.timer);
     this.pendingLogin = { name: name.trim(), password, timer: setTimeout(() => this.loginFailed('Aardwolf didn’t finish the login. Check the Chronicle for what it asked.'), 30000) };
     this.set({ login: { stage: 'waiting' } });
-    if (!this.state.connected) this.connect();
+    if (!this.state.connected && !this.connecting) this.connect();
     else if (this.atNamePrompt) this.sendLoginName();
+    else {
+      // Connected but no name prompt seen (e.g. this page reattached to a session already waiting
+      // at it). Not logged in, so nothing to lose: reconnect for a fresh prompt.
+      setTimeout(() => {
+        if (this.state.login.stage === 'waiting' && !this.atNamePrompt && !this.state.loggedIn && this.state.connected) this.connect();
+      }, 2000);
+    }
   }
   cancelSignIn() { if (this.pendingLogin) clearTimeout(this.pendingLogin.timer); this.pendingLogin = null; this.set({ login: { stage: 'idle' } }); }
 
-  private loginFailed(error: string) {
+  private loginFailed(error: string, retry = false) {
     if (this.pendingLogin) clearTimeout(this.pendingLogin.timer);
     this.pendingLogin = null;
-    this.set({ login: { stage: 'error', error } });
+    this.set({ login: { stage: 'error', error, ...(retry ? { retry } : {}) } });
   }
 
   private sendLoginName() {
@@ -335,7 +375,7 @@ export class Game {
     }
     if (!this.pendingLogin && this.state.login.stage !== 'password') return;
     if (WRONG_PASSWORD_RE.test(text)) this.loginFailed('Wrong password.');
-    else if (NEW_CHAR_RE.test(text)) this.loginFailed('Aardwolf doesn’t know that name: it’s offering to create a new character. Answer it in the command line, or check the name.');
+    else if (this.state.login.stage === 'name' && NEW_CHAR_RE.test(text)) this.loginFailed('Aardwolf doesn’t know that name: it’s offering to create a new character. Answer it in the command line, or check the name.');
     else if (PRESS_RETURN_RE.test(text) && this.state.login.stage === 'password') this.sendRaw({ t: 'cmd', d: '' });
   }
 
@@ -430,15 +470,22 @@ export class Game {
     this.trace.push({ at: Date.now(), msg });
     if (this.trace.length > 8000) this.trace.shift();
     switch (msg.t) {
-      case 'status':
+      case 'status': {
+        // The relay announces an attempt with a not-yet-connected status: that's progress, not failure.
+        const attempt = !msg.connected && /^Connecting to /.test(msg.msg ?? '');
+        this.connecting = attempt;
+        this.gameDown = !msg.connected;
         this.set({ connected: msg.connected, status: msg.msg ?? (msg.connected ? 'Connected' : 'Disconnected') });
         if (msg.msg) this.sys(`— ${msg.msg}`);
         if (!msg.connected) {
           this.set({ loggedIn: false, localEcho: true });
           this.atNamePrompt = false;
-          if (this.pendingLogin && this.state.login.stage !== 'waiting') this.loginFailed('The connection closed during login.');
+          this.dropBackgroundWork();
+          // Couldn't reach the game, or it hung up mid-login: worth another try later.
+          if (this.pendingLogin && !attempt) this.loginFailed(msg.msg ? `Couldn’t reach Aardwolf (${msg.msg}).` : 'The connection closed during login.', true);
         }
         break;
+      }
       case 'text': this.onText(msg.d); break;
       case 'prompt': this.sawGA = true; clearTimeout(this.promptTimer); this.onPrompt(); break;
       case 'echo':
