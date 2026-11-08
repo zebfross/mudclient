@@ -73,6 +73,25 @@ function setup() {
   assert.deepEqual(cmds(), ['Typoname'], 'password not sent, nothing answered');
   assert.equal(g.state.login.stage, 'error');
 }
+// The real Aardwolf sequence, recorded 2026-11-08: Name → "Existing profile loaded" → Password (echo off) → in.
+{
+  const { g, cmds } = setup();
+  g.onMessage({ t: 'status', connected: true });
+  g.signIn('Testchar', 'pw');
+  g.onMessage({ t: 'text', d: 'Name: ' });
+  await tick(300);
+  assert.deepEqual(cmds(), ['Testchar']);
+  g.onMessage({ t: 'text', d: '\n\rExisting profile loaded - please enter your password.\n\r\n\rPassword: ' });
+  g.onMessage({ t: 'echo', on: false });
+  g.onMessage({ t: 'echo', on: true });
+  g.onMessage({ t: 'text', d: '\n\rWelcome to Aardwolf. May your adventures be mystical, challenging and rewarding.\n\r' });
+  g.onMessage({ t: 'gmcp', pkg: 'char.base', data: { name: 'Testchar' } });
+  await tick();
+  assert.deepEqual(cmds(), ['Testchar', 'pw']);
+  assert.equal(g.state.loggedIn, true);
+  assert.equal(g.state.login.stage, 'idle');
+}
+
 // Aardwolf's real re-ask (seen live): "That name is not usable. Please try another." then "Name: ".
 {
   const { g, cmds } = setup();
