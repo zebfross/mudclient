@@ -54,3 +54,9 @@ export function Empty({ children }: { children: ReactNode }) {
 export const fillCommand = (text: string) => window.dispatchEvent(new CustomEvent('fill-command', { detail: text }));
 
 export { terrainIcon, terrainTint, guessTarget } from '../lib/roomText.ts';
+
+/**
+ * Spread onto inputs that aren't login fields, so password managers (Bitwarden, LastPass,
+ * 1Password) don't offer to fill them or to "update" a saved password when the form submits.
+ */
+export const NOT_A_LOGIN = { 'data-bwignore': 'true', 'data-lpignore': 'true', 'data-1p-ignore': 'true', autoComplete: 'off' } as const;

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
-import { Icon } from './ui.tsx';
+import { Icon, NOT_A_LOGIN } from './ui.tsx';
 import { QuickBar } from './QuickBar.tsx';
 import { searchHistory } from '../lib/history.ts';
 
@@ -146,9 +146,12 @@ export function CommandBar() {
         <label className="flex-1 flex items-center bg-surface-mid rounded px-3 py-2 border border-surface-high/40 shadow-inner focus-within:ring-1 focus-within:ring-primary">
           <span className="font-mono text-primary mr-2 font-bold select-none">{search ? <Icon name="history" className="text-sm" /> : localEcho ? '>_' : <Icon name="lock" className="text-sm" />}</span>
           <input
+            // A different element for the password: once a field has been type=password, password
+            // managers keep treating it as one and offer to "update" the password on every command.
+            key={localEcho ? 'command' : 'password'}
             ref={input}
             autoFocus
-            autoComplete="off"
+            {...(localEcho ? NOT_A_LOGIN : { autoComplete: 'current-password' })}
             autoCapitalize="off"
             spellCheck={false}
             type={localEcho ? 'text' : 'password'}

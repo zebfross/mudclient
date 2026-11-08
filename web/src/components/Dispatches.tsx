@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { game, isTellChan, parseTell, useGame, type ChatMsg } from '../lib/store.ts';
-import { CardHead, Empty, Icon, SegText } from './ui.tsx';
+import { CardHead, Empty, Icon, SegText, NOT_A_LOGIN } from './ui.tsx';
 
 const time = (at: number) => new Date(at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const GROUP_GAP = 3 * 60_000; // consecutive messages from one person within this share a label
@@ -102,6 +102,7 @@ export function Dispatches({ className = '', bare = false }: { className?: strin
         <label className="flex items-center gap-2 text-[11px] font-mono text-outline">
           <span className="label-caps">To</span>
           <input
+            {...NOT_A_LOGIN}
             list={listId}
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
@@ -118,6 +119,7 @@ export function Dispatches({ className = '', bare = false }: { className?: strin
         </label>
         <div className="flex items-center gap-2">
           <input
+            {...NOT_A_LOGIN}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder={recipient ? (recipient.startsWith('#') ? `Say on ${recipient.slice(1)}…` : `Message ${recipient}…`) : 'Choose who to message'}

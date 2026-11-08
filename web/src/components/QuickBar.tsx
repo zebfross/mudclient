@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
 import { DEFAULT_QUICK, loadQuick, move, newId, quickLabel, saveQuick, splitCommands, type QuickAction } from '../lib/quick.ts';
-import { Icon } from './ui.tsx';
+import { Icon, NOT_A_LOGIN } from './ui.tsx';
 
 const CHIP = 'px-2.5 py-1 rounded font-mono text-[11px] uppercase shrink-0 border';
 
@@ -78,11 +78,13 @@ export function QuickBar() {
           onKeyDown={(e) => { if (e.key === 'Escape') setDraft(null); }}
         >
           <input
+            {...NOT_A_LOGIN}
             autoFocus value={draft.cmd} onChange={(e) => setDraft({ ...draft, cmd: e.target.value })}
             placeholder="Command, e.g. get all corpse; sac corpse" aria-label="Quick action command" spellCheck={false}
             className="flex-[2_1_14rem] min-w-0 bg-surface-mid rounded px-2 py-1 font-mono text-xs border border-surface-high/40 focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <input
+            {...NOT_A_LOGIN}
             value={draft.label} onChange={(e) => setDraft({ ...draft, label: e.target.value })}
             placeholder="Label (optional)" aria-label="Quick action label"
             className="flex-[1_1_8rem] min-w-0 bg-surface-mid rounded px-2 py-1 text-xs border border-surface-high/40 focus:outline-none focus:ring-1 focus:ring-primary"
