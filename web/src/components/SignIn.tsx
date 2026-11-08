@@ -23,10 +23,18 @@ async function getFromBrowser(): Promise<PasswordCred | null> {
   } catch { return null; }
 }
 
-// With auto-login on, the login you used is kept in this tab's memory (never on disk) so the tab
-// can log back in after Aardwolf drops an idle connection. Password managers that fill forms (e.g.
-// Bitwarden) can't hand it over again without a page load. Closing the tab forgets it.
-let tabLogin: { name: string; password: string } | null = null;
+// With "remember me" on, the login is saved in this browser's local storage for this site, so any
+// tab can log back in: after a reload, a closed tab, or Aardwolf dropping an idle connection.
+// It's plain text in your browser profile, so only use it on your own computer.
+const SAVED_KEY = 'gaslamp.savedLogin';
+type Saved = { name: string; password: string };
+function loadSaved(): Saved | null {
+  try {
+    const v = JSON.parse(read(SAVED_KEY) || 'null') as Saved | null;
+    return v && typeof v.name === 'string' && typeof v.password === 'string' && v.name && v.password ? v : null;
+  } catch { return null; }
+}
+const saveLogin = (v: Saved | null) => write(SAVED_KEY, v ? JSON.stringify(v) : '');
 
 const RETRY_DELAYS = [0, 5_000, 30_000, 120_000];
 const STAGE_TEXT = { waiting: 'Connecting…', name: 'Sending your name…', password: 'Checking your password…' } as const;
@@ -42,9 +50,10 @@ export function SignIn() {
   const [noSaved, setNoSaved] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const [autofilled, setAutofilled] = useState(false);
+  const [hasSaved, setHasSaved] = useState(() => !!loadSaved());
 
   // Auto-login, if you turned it on: on page load and whenever the connection drops (Aardwolf
-  // times out idle players), Chrome hands over the saved login. It backs off and gives up after a
+  // times out idle players), it uses the login saved in this browser (or Chrome's saved one). It backs off and gives up after a
   // few tries, and never runs after you press Disconnect or after a wrong password.
   useEffect(() => {
     const ready = login.stage === 'idle' || (login.stage === 'error' && login.retry);
@@ -55,14 +64,15 @@ export function SignIn() {
       const l = game.state.login;
       if (game.state.loggedIn || game.state.manualDisconnect || !(l.stage === 'idle' || (l.stage === 'error' && l.retry))) return;
       attempts.current++;
-      const c = tabLogin ? { id: tabLogin.name, password: tabLogin.password } : await getFromBrowser();
+      const s = loadSaved();
+      const c = s ? { id: s.name, password: s.password } : await getFromBrowser();
       if (!c) { setNoSaved(true); return; }
       if (!game.state.loggedIn) { setName(c.id); game.signIn(c.id, c.password); }
     }, wait);
     return () => clearTimeout(t);
   }, [auto, loggedIn, manualDisconnect, sessionAt, login.stage, connected]);
   useEffect(() => { if (loggedIn) { attempts.current = 0; setNoSaved(false); } }, [loggedIn]);
-  useEffect(() => { if (login.stage === 'error' && /password/i.test(login.error ?? '')) tabLogin = null; }, [login]);
+  useEffect(() => { if (login.stage === 'error' && /password/i.test(login.error ?? '')) { saveLogin(null); setHasSaved(false); } }, [login]);
 
   // A password manager filling the form (the password appears all at once, not typed) logs in
   // right away when auto-login is on.
@@ -81,7 +91,8 @@ export function SignIn() {
     write(NAME_KEY, name.trim());
     write(AUTO_KEY, auto ? '1' : '');
     void storeInBrowser(name.trim(), password); // Chrome asks whether to save it
-    tabLogin = auto ? { name: name.trim(), password } : null;
+    saveLogin(auto ? { name: name.trim(), password } : null);
+    setHasSaved(auto);
     game.signIn(name, password);
     setPassword('');
   };
@@ -108,9 +119,13 @@ export function SignIn() {
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           <label className="flex items-center gap-2 text-xs text-on-surface-variant cursor-pointer select-none">
-            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); write(AUTO_KEY, e.target.checked ? '1' : ''); if (!e.target.checked) tabLogin = null; }} className="accent-[#ffb77d]" />
-            Log in automatically next time
+            <input type="checkbox" checked={auto} onChange={(e) => { setAuto(e.target.checked); write(AUTO_KEY, e.target.checked ? '1' : ''); if (!e.target.checked) { saveLogin(null); setHasSaved(false); } }} className="accent-[#ffb77d]" />
+            Remember me and log in automatically
           </label>
+          {hasSaved && !busy && (
+            <button type="button" className="text-[11px] text-outline hover:text-on-surface underline-offset-2 hover:underline"
+              onClick={() => { saveLogin(null); setHasSaved(false); }}>Forget saved password</button>
+          )}
           <span className="flex-1" />
           {busy ? (
             <>
@@ -124,13 +139,15 @@ export function SignIn() {
             </>
           )}
         </div>
-        {auto && noSaved && login.stage === 'idle' && (
+        {auto && noSaved && !hasSaved && login.stage === 'idle' && (
           <p className="text-xs text-secondary flex items-center gap-1.5"><Icon name="info" className="text-sm" />
-            Fill this form with your password manager (Bitwarden’s autofill works) and it logs in by itself. Chrome’s own password manager can also do it without the form.</p>
+            Log in once more and Gaslamp will remember you from then on.</p>
         )}
         {login.stage === 'error' && <p className="text-xs text-[#ff7b6b] flex items-center gap-1.5"><Icon name="error" className="text-sm" />{login.error}</p>}
         <p className="text-[10px] text-outline">
-          Your password goes to Aardwolf, and only into Chrome’s password manager if you choose to save it there. Gaslamp itself never stores it.
+          {auto
+            ? 'With “remember me” on, your name and password are saved in this browser (plain text in your browser profile), so only use it on your own computer.'
+            : 'Your password goes only to Aardwolf. Gaslamp doesn’t keep it.'}
         </p>
       </form>
     </section>
