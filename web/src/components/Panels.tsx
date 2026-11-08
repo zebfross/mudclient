@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { game, useGame, type InvItem } from '../lib/store.ts';
 import { CATEGORIES, categoryOf, type Category } from '../lib/inventory.ts';
 import { stripAard } from '../lib/aardColor.ts';
+import { compareItem, type Comparison, type ItemDetails } from '../lib/items.ts';
 import { Bar, CardHead, Empty, Icon, SegText, fillCommand } from './ui.tsx';
 
 // ---- Group ------------------------------------------------------------------
@@ -46,8 +48,39 @@ const FLAG_NAMES: Record<string, string> = { K: 'Kept', I: 'Invis', M: 'Magic', 
 
 const CAT_KEY = 'gaslamp.satchelTab';
 
+/** Compare carried items with what you wear, using cached `invdetails`. */
+function useComparisons() {
+  const { equipment, itemDetails, char } = useGame();
+  const worn = useMemo(() => equipment.map((e) => itemDetails[e.id]).filter((d): d is ItemDetails => !!d), [equipment, itemDetails]);
+  const level = Number(char.status?.level) || undefined;
+  return (id: string) => {
+    const d = itemDetails[id];
+    return d ? compareItem(d, worn, level) : null;
+  };
+}
+
+const VERDICT_STYLE: Record<Comparison['verdict'], string> = {
+  better: 'bg-tertiary/20 text-tertiary border-tertiary/40',
+  empty: 'bg-tertiary/20 text-tertiary border-tertiary/40',
+  worse: 'bg-[#d4574a]/15 text-[#ff7b6b] border-[#d4574a]/40',
+  same: 'bg-surface-high text-outline border-surface-highest',
+  toohigh: 'bg-surface-high text-outline border-surface-highest',
+};
+function verdictText(c: Comparison, level: number) {
+  if (c.verdict === 'toohigh') return `L${level}`;
+  if (c.verdict === 'empty') return 'new';
+  if (c.verdict === 'same') return '=';
+  return `${c.delta > 0 ? '▲' : '▼'}${Math.abs(c.delta)}`;
+}
+function verdictTitle(c: Comparison, level: number) {
+  if (c.verdict === 'toohigh') return `Needs level ${level}`;
+  if (c.verdict === 'empty') return 'Fills an empty slot';
+  return `${c.verdict === 'better' ? 'Better than' : c.verdict === 'worse' ? 'Worse than' : 'Same as'} what you wear (item score ${c.delta > 0 ? '+' : ''}${c.delta})`;
+}
+
 export function Satchel({ bare = false }: { bare?: boolean }) {
-  const { inventory, inventoryAt, equipment, loggedIn } = useGame();
+  const { inventory, inventoryAt, equipment, loggedIn, itemDetails } = useGame();
+  const compare = useComparisons();
   const [open, setOpen] = useState<{ item: InvItem; worn: boolean } | null>(null);
   const [cat, setCat] = useState<Category>(() => { try { return (localStorage.getItem(CAT_KEY) as Category) || 'all'; } catch { return 'all'; } });
   const choose = (c: Category) => { setCat(c); try { localStorage.setItem(CAT_KEY, c); } catch { /* ignore */ } };
@@ -79,12 +112,20 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
         <div className={`grid grid-cols-3 @sm:grid-cols-4 gap-2 ${bare ? '' : 'max-h-80 overflow-y-auto scroll-thin pr-1'}`}>
           {items.map((it) => {
             const [typeLabel, icon] = TYPE_INFO[it.type] ?? ['Item', 'category'];
+            const worn = active === 'equipped';
+            const cmp = worn ? null : compare(it.id);
+            const score = itemDetails[it.id]?.score;
             return (
-              <button key={it.id} onClick={() => setOpen({ item: it, worn: active === 'equipped' })} title={it.plainName}
-                className="aspect-square bg-surface-lowest/50 rounded p-1.5 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-lowest/80 border border-surface-high/30 group">
+              <button key={it.id} onClick={() => setOpen({ item: it, worn })} title={`${it.plainName}${cmp ? ` — ${verdictTitle(cmp, it.level)}` : ''}`}
+                className="relative aspect-square bg-surface-lowest/50 rounded p-1.5 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-lowest/80 border border-surface-high/30 group">
                 <Icon name={icon} className="text-primary text-xl group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] text-on-surface-variant mt-1 leading-tight line-clamp-2"><SegText segs={it.name} /></span>
-                <span className="font-mono text-[8px] text-outline uppercase mt-0.5">{typeLabel} · L{it.level}</span>
+                <span className="font-mono text-[8px] text-outline uppercase mt-0.5">{typeLabel} · L{it.level}{worn && score !== undefined ? ` · ★${score}` : ''}</span>
+                {cmp && (
+                  <span className={`absolute top-1 right-1 rounded border px-1 font-mono text-[9px] font-bold leading-tight ${VERDICT_STYLE[cmp.verdict]}`}>
+                    {verdictText(cmp, it.level)}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -101,14 +142,19 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
 
 function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: boolean; onClose: () => void }) {
   const [label, icon, verb] = TYPE_INFO[item.type] ?? ['Item', 'category'];
+  const { itemDetails, equipment } = useGame();
+  const details = itemDetails[item.id];
+  const cmp = useComparisons()(item.id);
+  const against = cmp?.against && equipment.find((e) => e.id === cmp.against!.id);
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
   }, [onClose]);
   const act = (cmd: string) => { game.command(cmd); onClose(); };
-  return (
-    <div className="fixed inset-0 z-[60] bg-background/80 backdrop-blur-md flex items-center justify-center p-4" onClick={onClose}>
+  // Portal: the sidebar's blur/sticky styles would otherwise trap the overlay inside it.
+  return createPortal(
+    <div className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-md flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-surface-low max-w-lg w-full rounded-xl p-5 shadow-2xl flex flex-col gap-4 border border-surface-high/40" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal>
         <div className="flex items-start justify-between pb-2.5 border-b border-surface-high/30">
           <div className="flex items-center gap-2">
@@ -128,6 +174,45 @@ function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: bool
             </div>
           ))}
         </div>
+        {details && (
+          <div className="flex flex-col gap-2 rounded-lg bg-surface-mid/60 p-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-xs text-on-surface-variant">
+                {details.wear ? <>Worn on <b className="text-on-surface">{details.wear}</b></> : 'Not wearable'}
+                {details.weapon && <> · {details.weapon.kind}, {details.weapon.damage.toLowerCase()}, avg {details.weapon.avg}</>}
+              </span>
+              <span className="font-mono text-xs text-primary" title="Aardwolf's item score">★ {details.score}</span>
+            </div>
+            {Object.keys(details.stats).length > 0 && (
+              <div className="flex gap-1.5 flex-wrap">
+                {Object.entries(details.stats).map(([k, v]) => (
+                  <span key={k} className="chip bg-surface-high text-on-surface-variant border-surface-highest normal-case tracking-normal">{k} {v > 0 ? '+' : ''}{v}</span>
+                ))}
+              </div>
+            )}
+            {cmp && !worn && (
+              <div className="border-t border-surface-high/40 pt-2 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className={`rounded border px-1.5 font-mono text-[10px] font-bold ${VERDICT_STYLE[cmp.verdict]}`}>{verdictText(cmp, details.level)}</span>
+                  <span className="text-on-surface-variant">
+                    {cmp.verdict === 'toohigh' ? `You can wear this at level ${details.level}.`
+                      : cmp.verdict === 'empty' ? `Nothing worn on your ${details.wear} yet — wearing it is pure gain.`
+                      : <>Compared with your <b className="text-on-surface">{against ? <SegText segs={against.name} /> : 'worn item'}</b> (★ {cmp.against?.score})</>}
+                  </span>
+                </div>
+                {cmp.stats.length > 0 && (
+                  <div className="flex gap-1.5 flex-wrap">
+                    {cmp.stats.map(([k, v]) => (
+                      <span key={k} className={`chip normal-case tracking-normal ${v > 0 ? 'bg-tertiary/15 text-tertiary border-tertiary/30' : 'bg-[#d4574a]/15 text-[#ff7b6b] border-[#d4574a]/40'}`}>
+                        {k} {v > 0 ? '+' : ''}{v}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {(item.flags || item.unique) && (
           <div className="flex gap-1.5 flex-wrap">
             {item.unique && <span className="chip bg-tertiary/15 text-tertiary border-tertiary/30">Unique</span>}
@@ -143,6 +228,7 @@ function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: bool
           {verb && !worn && <button className="btn btn-primary" onClick={() => act(`${verb} ${item.id}`)}>{verb}</button>}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -5,6 +5,7 @@ import { aardSegs, stripAard } from './aardColor.ts';
 import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
 import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
+import { DETAIL_TYPES, parseInvDetails, type ItemDetails } from './items.ts';
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
 
@@ -38,6 +39,7 @@ export interface State {
   inventory: InvItem[];
   inventoryAt: number;
   equipment: InvItem[];
+  itemDetails: Record<string, ItemDetails>; // from `invdetails`, by object id
   chat: ChatMsg[];
   group?: { groupname: string; leader: string; members: GroupMember[] };
   tagsListing: string[];
@@ -84,7 +86,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -98,8 +100,8 @@ export class Game {
   private hideMatching: { re: RegExp; until: number } | null = null;
   private tellHistoryQuietUntil = 0; // hide `tell -h` output the client asked for itself
   private tellOffset = 0;            // server clock minus local clock, learned from matching tells
-  private capture: { cb: CaptureCb; start: RegExp; started: boolean; lines: Seg[][]; timer: ReturnType<typeof setTimeout> } | null = null;
-  private captureQueue: { cmd: string; start: RegExp; cb: CaptureCb }[] = [];
+  private capture: { cb: CaptureCb; start: RegExp; end?: RegExp; started: boolean; lines: Seg[][]; timer: ReturnType<typeof setTimeout> } | null = null;
+  private captureQueue: { cmd: string; start: RegExp; end?: RegExp; cb: CaptureCb }[] = [];
   private mapTimer: ReturnType<typeof setTimeout> | undefined;
   // The player's prompt, learned from a confirmed prompt with numbers generalised, so a prompt is
   // recognised however it arrives: after GA, after a pause, ended by a newline, or with a reply
@@ -182,15 +184,19 @@ export class Game {
    * next prompt. Output that arrives before the reply starts (broadcasts, earlier commands) is
    * shown normally. Captures run one at a time, in order, and each gives up after a timeout.
    */
-  private captureReply(cmd: string, start: RegExp, cb: CaptureCb) {
-    this.captureQueue.push({ cmd, start, cb });
+  /**
+   * Send `cmd` quietly and hand its reply to `cb`. The reply starts at a line matching `start` and
+   * ends at the next prompt, or at a line matching `end` for replies Aardwolf sends without one.
+   */
+  private captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
+    this.captureQueue.push({ cmd, start, end, cb });
     if (!this.capture) this.nextCapture();
   }
 
   private nextCapture() {
     const next = this.captureQueue.shift();
     if (!next) return;
-    this.capture = { cb: next.cb, start: next.start, started: false, lines: [], timer: setTimeout(() => this.endCapture(false), 5000) };
+    this.capture = { cb: next.cb, start: next.start, end: next.end, started: false, lines: [], timer: setTimeout(() => this.endCapture(false), 5000) };
     this.sendRaw({ t: 'cmd', d: next.cmd });
   }
 
@@ -250,6 +256,28 @@ export class Game {
   }
 
   gmcp(pkg: string, data?: unknown) { this.sendRaw({ t: 'gmcp', pkg, data }); }
+
+  private detailsPending = new Set<string>();
+  /** Quietly look up stats for wearable items we haven't seen before (each id once; they're cached). */
+  fetchItemDetails() {
+    if (!this.state.loggedIn) return;
+    // Nothing in flight: anything still marked pending never got an answer, so it may be retried.
+    if (!this.capture && !this.captureQueue.length) this.detailsPending.clear();
+    const { inventory, equipment, itemDetails } = this.state;
+    for (const it of [...equipment, ...inventory]) {
+      if (!DETAIL_TYPES.has(it.type) || itemDetails[it.id] || this.detailsPending.has(it.id)) continue;
+      this.detailsPending.add(it.id);
+      // No prompt follows an invdetails reply, so it ends at its closing tag.
+      this.captureReply(`invdetails ${it.id}`, /^\s*\{invdetails\}/, (lines) => {
+        this.detailsPending.delete(it.id);
+        const d = parseInvDetails(lines);
+        if (!d) return;
+        const next = { ...this.state.itemDetails, [it.id]: d };
+        this.set({ itemDetails: next });
+        saveItemDetails(next);
+      }, /^\s*\{\/invdetails\}/);
+    }
+  }
 
   refreshInventory(delay = 0) {
     clearTimeout(this.invTimer);
@@ -324,8 +352,12 @@ export class Game {
     }
 
     if (this.capture) {
-      if (this.capture.started) { this.capture.lines.push(segs); return; }
-      if (this.capture.start.test(text)) { this.capture.started = true; this.capture.lines.push(segs); return; }
+      if (this.capture.started || this.capture.start.test(text)) {
+        this.capture.started = true;
+        this.capture.lines.push(segs);
+        if (this.capture.end?.test(text)) this.endCapture(true);
+        return;
+      }
       // The reply may arrive glued onto a prompt: "[158hp] > Tag Name …". Split it off.
       const glued = new RegExp(`^(.*?[>\\]] )(?=${this.capture.start.source.replace(/^\^(\\s\*)?/, '')})`).exec(text);
       if (glued) {
@@ -403,8 +435,8 @@ export class Game {
     if (tag === 'rdesc') this.set({ roomDesc: nonEmpty.map((l) => plain(l).trim()) });
     else if (tag === 'roomchars') this.set({ roomChars: nonEmpty });
     else if (tag === 'roomobjs') this.set({ roomObjs: nonEmpty });
-    else if (tag === 'eqdata') this.set({ equipment: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x) });
-    else if (tag === 'invdata') this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() });
+    else if (tag === 'eqdata') { this.set({ equipment: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x) }); this.fetchItemDetails(); }
+    else if (tag === 'invdata') { this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() }); this.fetchItemDetails(); }
   }
 
   private onGmcp(pkg: string, data: any) {
@@ -657,6 +689,16 @@ export function replyTarget(c: ChatMsg) {
 const CHAT_KEY = 'gaslamp.chat.v1';
 const CHAT_MAX = 400;
 let chatSaveTimer: ReturnType<typeof setTimeout> | undefined;
+
+const ITEMS_KEY = 'gaslamp.items.v1';
+function loadItemDetails(): Record<string, ItemDetails> {
+  try { return JSON.parse(localStorage.getItem(ITEMS_KEY) ?? '{}'); } catch { return {}; }
+}
+function saveItemDetails(all: Record<string, ItemDetails>) {
+  // Keep the cache small: the most recent 400 items.
+  const entries = Object.entries(all).slice(-400);
+  try { localStorage.setItem(ITEMS_KEY, JSON.stringify(Object.fromEntries(entries))); } catch { /* quota */ }
+}
 
 function loadChat(): ChatMsg[] {
   try {

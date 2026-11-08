@@ -109,7 +109,7 @@ assert.ok(!g2.state.lines.some((l) => plain(l.segs).includes('Claire')), 'histor
 // …and the same for a tag block glued to a prompt.
 g2.refreshInventory();
 await tick();
-g2.onMessage({ t: 'text', d: '[158/158hp] > {invdata}\r\n1,,a belt,1,7,0,-1,-1\r\n{/invdata}\r\n' });
+g2.onMessage({ t: 'text', d: '[158/158hp] > {invdata}\r\n1,,a belt,1,10,0,-1,-1\r\n{/invdata}\r\n' });
 await tick();
 assert.deepEqual(g2.state.inventory.map((i) => i.plainName), ['a belt']);
 assert.ok(!g2.state.lines.some((l) => plain(l.segs).includes('invdata')));
