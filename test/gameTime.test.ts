@@ -4,6 +4,8 @@ import { formatDate, formatHour, parseHour, parseTimeLine, phaseOf } from '../we
 // Real line recorded 2026-11-07.
 assert.deepEqual(parseTimeLine('  *  It is Noon in the daytime of the 97th day of the Season of the Snake, year 32 AVT.'),
   { hour: 12, day: 97, season: 'Season of the Snake', year: 32 });
+assert.deepEqual(parseTimeLine('  *  It is 7pm in the evening of the 97th day of the Season of the Snake, year 32 AVT.'),
+  { hour: 19, day: 97, season: 'Season of the Snake', year: 32 });
 assert.equal(parseTimeLine('  *  It is the year of Friendship.'), null);
 assert.equal(parseTimeLine('Nothing to see'), null);
 // Other hours: wording not seen live yet, so accept the likely forms.
