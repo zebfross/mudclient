@@ -20,6 +20,28 @@ function Vital({ label, value, max, color, labelColor }: { label: string; value?
   );
 }
 
+// Aardwolf reports hunger and thirst as 0–100 in char.status, where 100 is full.
+function fullness(kind: 'hunger' | 'thirst', v: number) {
+  if (kind === 'hunger') return v >= 70 ? 'Well fed' : v >= 40 ? 'Peckish' : v >= 15 ? 'Hungry' : 'Starving';
+  return v >= 70 ? 'Not thirsty' : v >= 40 ? 'A little thirsty' : v >= 15 ? 'Thirsty' : 'Dehydrated';
+}
+
+/** A small unlabelled meter: the icon says what it is, the tooltip says the rest. */
+function Need({ kind, value }: { kind: 'hunger' | 'thirst'; value?: number }) {
+  const v = typeof value === 'number' ? Math.max(0, Math.min(100, value)) : undefined;
+  const low = v !== undefined && v < 15, warn = v !== undefined && v < 40;
+  const tone = low ? 'text-[#ff7b6b]' : warn ? 'text-secondary' : 'text-on-surface-variant';
+  const bar = low ? 'bg-[#d4574a]' : warn ? 'bg-secondary' : kind === 'hunger' ? 'bg-[#c9a36a]' : 'bg-[#6aa9c9]';
+  const what = kind === 'hunger' ? 'Food' : 'Drink';
+  const tip = v === undefined ? `${what}: unknown` : `${what}: ${v}% · ${fullness(kind, v)}${warn ? (kind === 'hunger' ? ' (eat something)' : ' (drink something)') : ''}`;
+  return (
+    <div className={`flex items-center gap-1 ${low ? 'animate-pulse' : ''}`} title={tip} aria-label={tip}>
+      <Icon name={kind === 'hunger' ? 'restaurant' : 'water_drop'} className={`text-sm ${tone}`} />
+      <div className="w-8"><Bar value={v ?? 0} max={100} className={bar} /></div>
+    </div>
+  );
+}
+
 export function Header() {
   const s = useGame();
   const { base, vitals, maxstats, status, worth } = s.char;
@@ -42,6 +64,8 @@ export function Header() {
           <Vital label="HP" value={vitals?.hp} max={maxstats?.maxhp} color="bg-[#d4574a]" labelColor="text-[#ff7b6b]" />
           <Vital label="MN" value={vitals?.mana} max={maxstats?.maxmana} color="bg-tertiary-container" labelColor="text-tertiary" />
           <Vital label="MV" value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
+          <Need kind="hunger" value={status?.hunger === undefined ? undefined : Number(status.hunger)} />
+          <Need kind="thirst" value={status?.thirst === undefined ? undefined : Number(status.thirst)} />
           <div className="h-3.5 w-px bg-surface-high" />
           <div className="flex items-center gap-1" title="Gold on hand">
             <Icon name="monetization_on" className="text-secondary text-sm" />
