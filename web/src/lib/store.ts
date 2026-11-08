@@ -24,6 +24,8 @@ export interface NotesState {
 export interface NoteDraft { to: string; subject: string; body: string }
 // Aardwolf's exact wording isn't documented, so these are deliberately broad.
 const NOTE_REFUSED_RE = /not found|no such|no one|nobody|invalid|cannot|can't|unable|not allowed|you must|huh\?/i;
+const NOTE_EDITOR_IN_RE = /^\s*You are now creating a new post|^\s*Enter your post\. Type END/i;
+const NOTE_EDITOR_OUT_RE = /^\s*You are back in the game|^\s*Note cancelled/i;
 const NOTE_POSTED_RE = /note (?:has been |was )?(?:posted|sent)|posted (?:to|on)|your note (?:has|is)|added to the/i;
 
 /**
@@ -105,6 +107,8 @@ export interface State {
   asciiMap: Seg[][];
   /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
   death: { at: number } | null;
+  /** In Aardwolf's note editor: whatever you type becomes part of the note. */
+  noteEditor: boolean;
   lasertag: Lasertag;
 }
 
@@ -143,7 +147,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, noteEditor: false, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -506,6 +510,8 @@ export class Game {
 
   private noteFailed(error: string) {
     if (this.writer) clearTimeout(this.writer.timer);
+    // Our own half-written note: leave the editor rather than strand you in it.
+    if (this.writer && this.writer.stage !== 'to' && this.state.noteEditor) { this.sendRaw({ t: 'cmd', d: '.q' }); error = `${error.replace(/ If the log.*$/, '')} The unfinished note was cancelled.`; }
     this.writer = null;
     this.patchNotes({ compose: { stage: 'error', error } });
     this.nextCapture();
@@ -550,7 +556,8 @@ export class Game {
         this.noteFailed('The note editor didn’t open, so the note wasn’t sent.');
       }
     } else if (w.stage === 'posting') {
-      if (NOTE_POSTED_RE.test(text)) {
+      if (/^\s*You are back in the game/i.test(text) && !NOTE_POSTED_RE.test(text)) { clearTimeout(w.timer); this.confirmPosted(w.subject); }
+      else if (NOTE_POSTED_RE.test(text)) {
         clearTimeout(w.timer);
         this.writer = null;
         this.patchNotes({ compose: { stage: 'posted' } });
@@ -576,7 +583,7 @@ export class Game {
 
   cancelNoteWrite() {
     const w = this.writer;
-    if (w && w.stage !== 'to') this.sendRaw({ t: 'cmd', d: '.q' });
+    if (w && w.stage !== 'to') this.sendRaw({ t: 'cmd', d: '.q' }); // at the subject prompt, .q would become the subject
     if (w) clearTimeout(w.timer);
     this.writer = null;
     this.patchNotes({ compose: undefined });
@@ -627,7 +634,7 @@ export class Game {
         this.set({ connected: msg.connected, status: msg.msg ?? (msg.connected ? 'Connected' : 'Disconnected') });
         if (msg.msg) this.sys(`— ${msg.msg}`);
         if (!msg.connected) {
-          this.set({ loggedIn: false, localEcho: true });
+          this.set({ loggedIn: false, localEcho: true, noteEditor: false });
           this.atNamePrompt = false;
           this.dropBackgroundWork();
           // Couldn't reach the game, or it hung up mid-login: worth another try later.
@@ -675,6 +682,8 @@ export class Game {
 
   private line(segs: Seg[], isPrompt: boolean) {
     const text = plain(segs);
+    if (NOTE_EDITOR_IN_RE.test(text)) { if (!this.state.noteEditor) this.set({ noteEditor: true }); }
+    else if (this.state.noteEditor && NOTE_EDITOR_OUT_RE.test(text)) this.set({ noteEditor: false });
     if (this.writer) this.watchWriter(text);
     if (!this.state.loggedIn) {
       if (text === this.loginPartialSeen) this.loginPartialSeen = ''; // already handled as it arrived

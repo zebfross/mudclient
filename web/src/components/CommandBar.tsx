@@ -19,7 +19,8 @@ function Highlight({ text, query }: { text: string; query: string }) {
 interface Search { query: string; idx: number; saved: string }
 
 export function CommandBar() {
-  const { localEcho, connected } = useGame();
+  const { localEcho, connected, noteEditor, notes } = useGame();
+  const writing = !!notes.compose && !['error', 'posted'].includes(notes.compose.stage);
   const [value, setValue] = useState('');
   const [search, setSearch] = useState<Search | null>(null);
   const history = useRef<string[]>(loadHistory());
@@ -117,6 +118,14 @@ export function CommandBar() {
 
   return (
     <div className="sticky bottom-3 z-40 backdrop-blur-md rounded-xl p-3 shadow-[0_-8px_30px_rgba(0,0,0,0.85)] border border-surface-high/40 flex flex-col gap-2 bg-surface-lowest/80">
+      {noteEditor && !writing && (
+        <div className="rounded border border-secondary/50 bg-secondary/10 px-2.5 py-1.5 flex items-center gap-2 flex-wrap text-xs text-secondary" role="status">
+          <Icon name="edit_note" className="text-base" />
+          <span className="flex-1 min-w-[12rem]">You’re in Aardwolf’s note editor: what you type here becomes part of the note, not a command.</span>
+          <button type="button" className="btn" onClick={() => game.command('.q')}>Cancel note</button>
+          <button type="button" className="btn btn-primary" onClick={() => game.command('.p')}>Post it</button>
+        </div>
+      )}
       <QuickBar />
       {search && (
         <div className="rounded border border-surface-high/40 bg-surface-low/95 p-1.5">

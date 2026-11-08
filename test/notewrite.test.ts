@@ -90,6 +90,27 @@ function setup() {
   assert.equal(g.state.notes.compose?.stage, 'error');
 }
 
+// Knowing when you're in the editor, and leaving it if our own note fails partway.
+{
+  const { g, sent, say } = setup();
+  say('You are now creating a new post in the Personal forum.\r\n');
+  await tick();
+  assert.equal(g.state.noteEditor, true);
+  say('Note cancelled!\r\nYou are back in the game.\r\n> ');
+  await tick();
+  assert.equal(g.state.noteEditor, false);
+
+  g.writeNote({ to: 'Finch', subject: 'Goals', body: 'x' });
+  say('Current forum changed to Personal.\r\n> ');
+  await tick(250);
+  say('You are now creating a new post in the Personal forum.\r\nSubject :  ');
+  await tick(700);
+  assert.equal(sent.at(-1), '.s');
+  (g as any).noteFailed('Aardwolf didn’t answer as expected.');
+  assert.equal(sent.at(-1), '.q', 'cancels its own unfinished note');
+  assert.match(g.state.notes.compose?.error ?? '', /cancelled/);
+}
+
 // While writing, background lookups wait so they can't land in the note.
 {
   const { g, sent, say } = setup();
