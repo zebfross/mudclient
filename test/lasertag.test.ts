@@ -7,6 +7,30 @@ assert.deepEqual(parseCharges('[Charges: 95/100] >'), { charges: 95, max: 100 })
 assert.deepEqual(parseCharges('<95 charges> '), { charges: 95, max: undefined });
 assert.equal(parseCharges('[158/158hp 189/189mn] >'), null);
 
+// Real scan output recorded 2026-11-07 (test/fixtures/trace-1794100422966.json).
+const real = parseScan([
+  'Right here you see:',
+  '     - (Player) Pell',
+  '     - (Player) (Flying) (White Aura) (OPK) Tamsin',
+  'North from here you see:',
+  '     - (Flying) (Translucent) (White Aura) A Benevolent Priestess',
+  '3 North from here you see:',
+  '     - (Flying) (Translucent) (White Aura) Mother Mystra',
+  '2 East from here you see:',
+  '     - (Player) (Flying) (White Aura) (OPK) Corvon',
+  '     - (Player) Ysoldewynn',
+  '2 South from here you see:',
+  '     - (Player) (Flying) (Linkdead) Hollisfarr',
+  '3 South from here you see:',
+  '     - A touring dwarf',
+]);
+assert.deepEqual(real.map((t) => [t.dir, t.dist, t.name, t.player]), [
+  ['north', 1, 'Priestess', false], ['north', 3, 'Mother', false],
+  ['east', 2, 'Corvon', true], ['east', 2, 'Ysoldewynn', true],
+  ['south', 2, 'Hollisfarr', true], ['south', 3, 'dwarf', false],
+]);
+assert.deepEqual(parseScan(['5 West from here you see:', '  - (Player) Far']).map((t) => t.dist), [5], 'numeric distance beyond 4');
+
 // Style 1: ROM-like headers per direction and distance.
 const s1 = parseScan([
   'Right here you see:',
@@ -65,5 +89,8 @@ await new Promise((r) => setTimeout(r, 0));
 assert.deepEqual(g.state.lasertag.status, ['There is no lasertag game being run at the moment.', 'The next lasertag game will start in approximately 86 minutes.']);
 const minsLeft = Math.round((g.state.lasertag.nextGameAt! - Date.now()) / 60_000);
 assert.equal(minsLeft, 86);
+// Announcement seen live when a game was cancelled.
+g.onMessage({ t: 'text', d: '\n\r\u001b[1;37mLasertag\u001b[1;36m: \u001b[0;37mNot enough players joined lasertag - game cancelled.\n\r' });
+assert.equal(g.state.lasertag.news?.text, 'Not enough players joined lasertag - game cancelled.');
 console.log('lasertag tests passed');
 process.exit(0);

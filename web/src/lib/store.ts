@@ -343,6 +343,8 @@ export class Game {
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
     if (this.mirror) this.mirror.lines.push(text);
+    const news = /^\s*Lasertag\s*:\s*(.+)$/.exec(text);
+    if (news) this.lt({ news: { text: news[1].trim(), at: Date.now() } });
     const team = TEAM_RE.exec(text);
     if (team) this.lt({ team: team[1].toLowerCase() as Team });
     const hist = TELL_HISTORY_RE.exec(text);

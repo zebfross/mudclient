@@ -25,7 +25,8 @@ export function LasertagPanel() {
   const inArena = useInArena();
   const mustMove = lt.firedInRoom !== undefined && lt.firedInRoom === room?.num;
   const groups = new Map<string, Target[]>();
-  for (const t of lt.targets) groups.set(t.dir, [...(groups.get(t.dir) ?? []), t]);
+  const sorted = [...lt.targets].sort((a, b) => Number(b.player) - Number(a.player));
+  for (const t of sorted) groups.set(t.dir, [...(groups.get(t.dir) ?? []), t]);
   const age = lt.scanAt ? Math.round((Date.now() - lt.scanAt) / 1000) : null;
 
   return (
@@ -51,6 +52,13 @@ export function LasertagPanel() {
                 {!inArena && <button className="btn btn-primary" onClick={() => game.command('lasertag join')}>Join</button>}
               </div>
             </div>
+            {lt.news && Date.now() - lt.news.at < 30 * 60_000 && (
+              <p className="mb-2 flex items-start gap-1.5 rounded bg-surface-mid/60 px-2 py-1.5 text-xs text-on-surface">
+                <Icon name="campaign" className="text-sm text-primary" />
+                <span className="flex-1">{lt.news.text}</span>
+                <span className="font-mono text-[10px] text-outline">{new Date(lt.news.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+              </p>
+            )}
             <NextGame at={lt.nextGameAt} />
             {lt.status.length > 0
               ? <ul className="text-xs text-on-surface-variant flex flex-col gap-0.5">{lt.status.map((l, i) => <li key={i}>{l}</li>)}</ul>
@@ -82,7 +90,7 @@ export function LasertagPanel() {
                         const friendly = !!team && team === lt.team;
                         return (
                           <li key={`${t.name}-${i}`} className="flex items-center gap-2 rounded bg-surface-mid/60 px-2 py-1.5">
-                            <span className="text-xs font-semibold flex-1 min-w-0 truncate" title={t.label}>{t.name}</span>
+                            <span className={`text-xs flex-1 min-w-0 truncate ${t.player ? 'font-semibold' : 'text-outline'}`} title={t.label}>{t.player ? t.name : t.label.replace(/^(\s*[([][^)\]]*[)\]]\s*)+/, '')}</span>
                             <span className="font-mono text-[10px] text-outline">{t.dist > 1 ? `${t.dist} rooms` : 'next room'}</span>
                             <TeamChip team={team} />
                             <button className="btn px-1.5" title="Edit the shot first" onClick={() => fillCommand(`shoot ${t.dir} ${t.name}`)}><Icon name="edit" className="text-xs" /></button>

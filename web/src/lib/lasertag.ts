@@ -2,7 +2,7 @@
 // deliberately tolerant; check them against a recorded game (test/fixtures) and tighten.
 
 export type Team = 'red' | 'green';
-export interface Target { dir: string; dist: number; name: string; label: string; team?: Team }
+export interface Target { dir: string; dist: number; name: string; label: string; team?: Team; player: boolean }
 export interface Lasertag {
   charges?: number;
   maxCharges?: number;
@@ -13,6 +13,7 @@ export interface Lasertag {
   scanAt: number;
   status: string[];
   score: string[];
+  news?: { text: string; at: number }; // latest "Lasertag: ..." announcement
   firedInRoom?: number; // room you last fired from; you must move before firing again
   nextGameAt?: number; // from `lasertag status`
 }
@@ -32,8 +33,9 @@ export function parseCharges(prompt: string): { charges: number; max?: number } 
 const teamOf = (s: string): Team | undefined => (/\bred\b/i.test(s) ? 'red' : /\bgreen\b/i.test(s) ? 'green' : undefined);
 
 /**
- * `scan` output: direction headers ("North from here you see:", "Not far north you see:") each
- * followed by entries ("  - (Green) Bob"). People in your own room can't be shot, so they're skipped.
+ * `scan` output (seen live): "Right here you see:", "North from here you see:", "3 North from here
+ * you see:", each followed by entries like "     - (Player) (Flying) (OPK) Corvon". The leading
+ * number is the distance. People in your own room can't be shot, so they're skipped.
  */
 export function parseScan(lines: string[]): Target[] {
   const out: Target[] = [];
@@ -46,15 +48,20 @@ export function parseScan(lines: string[]): Target[] {
     if (head) {
       const d = DIRS.find((x) => new RegExp(`\\b${x}\\b`).test(head));
       dir = /right here|in the room|here you see/.test(head) && !d ? null : d ?? null;
-      dist = DIST_WORDS.find(([re]) => re.test(head))?.[1] ?? 1;
+      const n = /^\s*(\d+)\s+\w/.exec(head);
+      dist = n ? Number(n[1]) : DIST_WORDS.find(([re]) => re.test(head))?.[1] ?? 1;
       continue;
     }
     if (!dir) continue;
     const label = line.replace(/^\s*[-*]\s*/, '').trim();
     if (!label) continue;
-    const team = teamOf((label.match(/[([][^)\]]*[)\]]/g) ?? []).join(' '));
-    const name = label.replace(/^(\s*[([][^)\]]*[)\]]\s*)+/, '').split(/\s+/)[0]?.replace(/[^A-Za-z]/g, '') ?? '';
-    if (name) out.push({ dir, dist, name, label, team });
+    const tags = (label.match(/[([][^)\]]*[)\]]/g) ?? []).join(' ');
+    const team = teamOf(tags);
+    const words = label.replace(/^(\s*[([][^)\]]*[)\]]\s*)+/, '').split(/\s+/);
+    // Players are one word; for mobs ("A touring dwarf") the last word is the usual keyword.
+    const word = /^(a|an|the)$/i.test(words[0] ?? '') ? words[words.length - 1] : words[0];
+    const name = word?.replace(/[^A-Za-z]/g, '') ?? '';
+    if (name) out.push({ dir, dist, name, label, team, player: /\(player\)/i.test(tags) });
   }
   return out;
 }
