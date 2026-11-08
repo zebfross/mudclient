@@ -6,6 +6,21 @@ import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
 import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
 import { DETAIL_TYPES, parseInvDetails, type ItemDetails } from './items.ts';
+import { parseBoards, parseNote, parseNoteList, type Board, type Note, type Post } from './notes.ts';
+
+export interface NotesState {
+  boards: Board[];
+  current?: string; // the game's current forum, as far as we know
+  forum: string; // the board shown in the panel
+  posts: Post[]; // newest first
+  open: Note | null;
+  reading?: number;
+  loading: boolean;
+  at: number;
+}
+const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: [], open: null, loading: false, at: 0 });
+// e.g. Aaeron says, "I have sent a personal note to you…" / "A new note has been posted…"
+const NEW_NOTE_RE = /\b(sent|posted|left|written)\b.*\bnote\b|\bnew (personal )?(note|post)s?\b/i;
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
 
@@ -45,6 +60,7 @@ export interface State {
   tagsListing: string[];
   mapVersion: number;
   objectives: Objectives;
+  notes: NotesState;
   asciiMap: Seg[][];
   /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
   death: { at: number } | null;
@@ -86,7 +102,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), asciiMap: [], death: null, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -257,6 +273,39 @@ export class Game {
 
   gmcp(pkg: string, data?: unknown) { this.sendRaw({ t: 'gmcp', pkg, data }); }
 
+  private notesTimer: ReturnType<typeof setTimeout> | undefined;
+  private patchNotes(p: Partial<NotesState>) { this.set({ notes: { ...this.state.notes, ...p } }); }
+
+  /** Quietly read the board list and the posts on `forum` (Personal unless you've picked another). */
+  refreshNotes(forum = this.state.notes.forum) {
+    if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'note list')) return;
+    this.patchNotes({ loading: true, forum });
+    this.captureReply('board', /^\+-+\+-+/, (lines) => this.patchNotes(parseBoards(lines)));
+    // `note list` shows the current forum, so switch to the one we want first.
+    this.captureReply(`forum ${forum.toLowerCase()}`, /forum/i, () => {});
+    this.captureReply('note list', /^\s*(Posts in the|There are no|No posts|You have no)/i, (lines) => {
+      const { posts } = parseNoteList(lines);
+      this.patchNotes({ posts: posts.slice(-40).reverse(), current: forum, loading: false, at: Date.now() });
+    });
+    setTimeout(() => { if (this.state.notes.loading) this.patchNotes({ loading: false }); }, 12000);
+  }
+
+  /** Read a note into the Notes panel (this marks it read, as reading it in the game would). */
+  readNote(num: number) {
+    this.patchNotes({ reading: num, open: null });
+    this.captureReply(`note read ${num}`, /^\s*~{10,}\s*$/, (_lines, segs) => {
+      const note = parseNote(segs);
+      const n = this.state.notes;
+      const wasUnread = n.posts.some((p) => p.num === num && p.unread);
+      this.patchNotes({
+        open: note, reading: undefined,
+        posts: n.posts.map((p) => (p.num === num ? { ...p, unread: false } : p)),
+        boards: wasUnread ? n.boards.map((b) => (b.name.toLowerCase() === n.forum.toLowerCase() ? { ...b, unread: Math.max(0, b.unread - 1) } : b)) : n.boards,
+      });
+    });
+  }
+  closeNote() { this.patchNotes({ open: null, reading: undefined }); }
+
   private detailsPending = new Set<string>();
   /** Quietly look up stats for wearable items we haven't seen before (each id once; they're cached). */
   fetchItemDetails() {
@@ -376,6 +425,7 @@ export class Game {
     }
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
+    if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
     if (this.mirror) this.mirror.lines.push(text);
     const news = /^\s*Lasertag\s*:\s*(.+)$/.exec(text);
     if (news) this.lt({ news: { text: news[1].trim(), at: Date.now() } });
@@ -620,6 +670,7 @@ export class Game {
     setTimeout(() => this.requestTellHistory(), 700);
     setTimeout(() => this.refreshObjectives(), 1200);
     this.refreshMap(1600);
+    setTimeout(() => this.refreshNotes(), 2200);
   }
 }
 

@@ -13,6 +13,7 @@ async function replay(knownPrompt: boolean) {
   g.attach(() => {});
   // This recording predates item-detail lookups, so it holds no `invdetails` replies to match them.
   g.fetchItemDetails = () => {};
+  g.refreshNotes = () => {}; // …nor note-board lookups
   if (knownPrompt) (g as any).promptRe = promptRegExp('[*Daily Blessing*] [158/158hp 189/189mn 541/541mv 0qt 415tnl] >');
   g.resume(); // what the client does on reattach
   const t0 = trace[0].at;

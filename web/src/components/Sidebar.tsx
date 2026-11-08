@@ -5,17 +5,19 @@ import { Curios, Souls } from './Room.tsx';
 import { Group, Satchel } from './Panels.tsx';
 import { Dispatches } from './Dispatches.tsx';
 import { Objectives } from './Objectives.tsx';
+import { Notes, usePersonalUnread } from './Notes.tsx';
 import { LasertagPanel, useInArena } from './Lasertag.tsx';
 import { questActive } from '../lib/objectives.ts';
 import { Icon } from './ui.tsx';
 
-type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat' | 'laser';
+type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat' | 'notes' | 'laser';
 const TABS: { id: TabId; icon: string; label: string }[] = [
   { id: 'objects', icon: 'category', label: 'Curios & Objects' },
   { id: 'satchel', icon: 'work', label: 'Satchel' },
   { id: 'goals', icon: 'flag', label: 'Objectives' },
   { id: 'souls', icon: 'group', label: 'Souls Present' },
   { id: 'chat', icon: 'forum', label: 'Dispatches' },
+  { id: 'notes', icon: 'mail', label: 'Notes' },
   { id: 'laser', icon: 'target', label: 'Lasertag' },
 ];
 const TAB_KEY = 'gaslamp.sidebarTab';
@@ -32,6 +34,7 @@ function loadTab(): TabId {
 export function Sidebar({ className = '' }: { className?: string }) {
   const { chat, roomObjs, roomChars, inventory, objectives, lasertag } = useGame();
   const inArena = useInArena();
+  const notesUnread = usePersonalUnread();
   const [tab, setTab] = useState<TabId>(loadTab);
   const [seenChat, setSeenChat] = useState(chat.length);
 
@@ -50,6 +53,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     goals: objectives.goals.length + (questActive(objectives.quest) ? 1 : 0) + (objectives.campaign?.active ? 1 : 0),
     souls: roomChars.length,
     chat: unread.length,
+    notes: notesUnread,
     laser: lasertag.targets.length,
   };
   const tellWaiting = unread.some((c) => isTellChan(c.chan));
@@ -60,6 +64,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     goals: <Objectives />,
     souls: <div className="flex flex-col gap-4"><Souls bare /><Group /></div>,
     chat: <Dispatches bare className="h-full" />,
+    notes: <Notes />,
     laser: <LasertagPanel />,
   };
 
@@ -86,7 +91,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
                 <Icon name={t.icon} className="text-xl" />
                 {n > 0 && (t.id !== 'chat' || !active) && (
                   <span className={`absolute top-1 right-[calc(50%-1.4rem)] min-w-4 h-4 px-1 rounded-full text-[9px] font-mono font-bold grid place-items-center ${
-                    t.id === 'chat' ? (tellWaiting ? 'bg-tertiary text-on-tertiary' : 'bg-primary text-on-primary') : 'bg-surface-highest text-on-surface-variant'
+                    t.id === 'chat' ? (tellWaiting ? 'bg-tertiary text-on-tertiary' : 'bg-primary text-on-primary') : t.id === 'notes' ? 'bg-tertiary text-on-tertiary' : 'bg-surface-highest text-on-surface-variant'
                   }`}>{n > 99 ? '99+' : n}</span>
                 )}
               </button>
