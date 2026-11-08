@@ -21,6 +21,12 @@ export interface NotesState {
 }
 const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: [], open: null, loading: false, at: 0 });
 // e.g. Aaeron says, "I have sent a personal note to you…" / "A new note has been posted…"
+export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string }
+// Aardwolf's wording isn't documented here, so these are deliberately broad.
+const NAME_PROMPT_RE = /what be thy name|what is your name|enter (?:your )?(?:character )?name|by what name|^\s*name\s*:\s*$/i;
+const WRONG_PASSWORD_RE = /wrong password|incorrect password|password (?:is )?incorrect|invalid password/i;
+const NEW_CHAR_RE = /did i get that right|is that (?:right|correct)\?|create (?:a )?new character|no such (?:player|character)/i;
+const PRESS_RETURN_RE = /press (?:return|enter)|\[\s*(?:return|enter)\s*\]|hit (?:return|enter)/i;
 const NEW_NOTE_RE = /\b(sent|posted|left|written)\b.*\bnote\b|\bnew (personal )?(note|post)s?\b/i;
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
@@ -38,6 +44,7 @@ export interface State {
   status: string;
   localEcho: boolean;
   loggedIn: boolean;
+  login: LoginState;
   lines: Line[];
   partial: Seg[];
   char: {
@@ -102,7 +109,7 @@ function stripPrefix(segs: Seg[], n: number): Seg[] {
 
 export class Game {
   state: State = {
-    connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
+    connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' },
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
     inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
@@ -275,6 +282,60 @@ export class Game {
 
   gmcp(pkg: string, data?: unknown) { this.sendRaw({ t: 'gmcp', pkg, data }); }
 
+  // ---- sign-in ----------------------------------------------------------------
+  // The password is only held in memory until it's sent at the password prompt, then dropped.
+  private pendingLogin: { name: string; password: string; timer: ReturnType<typeof setTimeout> } | null = null;
+  private atNamePrompt = false;
+  private loginPartialSeen = '';
+
+  /** Log in: connect if needed, answer the name prompt, then the password prompt (echo off). */
+  signIn(name: string, password: string) {
+    if (this.state.loggedIn || !name.trim() || !password) return;
+    if (this.pendingLogin) clearTimeout(this.pendingLogin.timer);
+    this.pendingLogin = { name: name.trim(), password, timer: setTimeout(() => this.loginFailed('Aardwolf didn’t finish the login. Check the Chronicle for what it asked.'), 30000) };
+    this.set({ login: { stage: 'waiting' } });
+    if (!this.state.connected) this.connect();
+    else if (this.atNamePrompt) this.sendLoginName();
+  }
+  cancelSignIn() { if (this.pendingLogin) clearTimeout(this.pendingLogin.timer); this.pendingLogin = null; this.set({ login: { stage: 'idle' } }); }
+
+  private loginFailed(error: string) {
+    if (this.pendingLogin) clearTimeout(this.pendingLogin.timer);
+    this.pendingLogin = null;
+    this.set({ login: { stage: 'error', error } });
+  }
+
+  private sendLoginName() {
+    const p = this.pendingLogin;
+    if (!p || this.state.login.stage !== 'waiting') return;
+    this.atNamePrompt = false;
+    this.set({ login: { stage: 'name' } });
+    this.command(p.name);
+  }
+
+  private onPasswordPrompt() {
+    const p = this.pendingLogin;
+    if (!p || this.state.login.stage !== 'name' || !p.password) return;
+    const pw = p.password;
+    p.password = '';
+    this.set({ login: { stage: 'password' } });
+    this.command(pw); // shown as dots: the server has echo off
+  }
+
+  /** Before login: spot the name prompt, the "press return" pause, and failures. */
+  private watchLogin(text: string) {
+    if (NAME_PROMPT_RE.test(text)) {
+      this.atNamePrompt = true;
+      if (this.state.login.stage === 'name') this.loginFailed('Aardwolf asked for the name again. Check the spelling.');
+      else this.sendLoginName();
+      return;
+    }
+    if (!this.pendingLogin && this.state.login.stage !== 'password') return;
+    if (WRONG_PASSWORD_RE.test(text)) this.loginFailed('Wrong password.');
+    else if (NEW_CHAR_RE.test(text)) this.loginFailed('Aardwolf doesn’t know that name: it’s offering to create a new character. Answer it in the command line, or check the name.');
+    else if (PRESS_RETURN_RE.test(text) && this.state.login.stage === 'password') this.sendRaw({ t: 'cmd', d: '' });
+  }
+
   /** Quietly read the game clock; ticks keep it going from there. */
   syncTime() {
     if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'time')) return;
@@ -369,11 +430,18 @@ export class Game {
       case 'status':
         this.set({ connected: msg.connected, status: msg.msg ?? (msg.connected ? 'Connected' : 'Disconnected') });
         if (msg.msg) this.sys(`— ${msg.msg}`);
-        if (!msg.connected) this.set({ loggedIn: false, localEcho: true });
+        if (!msg.connected) {
+          this.set({ loggedIn: false, localEcho: true });
+          this.atNamePrompt = false;
+          if (this.pendingLogin && this.state.login.stage !== 'waiting') this.loginFailed('The connection closed during login.');
+        }
         break;
       case 'text': this.onText(msg.d); break;
       case 'prompt': this.sawGA = true; clearTimeout(this.promptTimer); this.onPrompt(); break;
-      case 'echo': this.set({ localEcho: msg.on }); break;
+      case 'echo':
+        this.set({ localEcho: msg.on });
+        if (!msg.on) this.onPasswordPrompt();
+        break;
       case 'gmcp': this.onGmcp(msg.pkg, msg.data); break;
     }
   }
@@ -388,6 +456,11 @@ export class Game {
       });
     }
     if (!this.flushQueued) this.set({ partial: this.cur });
+    // Login questions end without a newline (and without GA on some servers): check them as they arrive.
+    if (!this.state.loggedIn && this.cur.length) {
+      const t = plain(this.cur);
+      if (NAME_PROMPT_RE.test(t) && t !== this.loginPartialSeen) { this.loginPartialSeen = t; this.watchLogin(t); }
+    }
     if (!this.sawGA && this.cur.length) {
       this.promptTimer = setTimeout(() => { if (this.cur.length) this.onPrompt(); }, 200);
     }
@@ -402,6 +475,10 @@ export class Game {
 
   private line(segs: Seg[], isPrompt: boolean) {
     const text = plain(segs);
+    if (!this.state.loggedIn) {
+      if (text === this.loginPartialSeen) this.loginPartialSeen = ''; // already handled as it arrived
+      else this.watchLogin(text);
+    }
 
     if (isPrompt) {
       if (text.trim()) this.learnPrompt(text);
@@ -671,6 +748,9 @@ export class Game {
 
   private onLogin() {
     this.set({ loggedIn: true });
+    this.atNamePrompt = false;
+    if (this.pendingLogin) { clearTimeout(this.pendingLogin.timer); this.pendingLogin = null; }
+    if (this.state.login.stage !== 'idle') this.set({ login: { stage: 'idle' } });
     // Wait for the prompt that ends the login burst, so hidden replies can't swallow real output.
     this.setupPending = true;
     // …or after a quiet moment, if no prompt comes (e.g. right after reattaching).
