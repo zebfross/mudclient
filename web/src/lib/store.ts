@@ -267,7 +267,9 @@ export class Game {
     this.capture = null;
     clearTimeout(c.timer);
     if (ok) c.cb(c.lines.map(plain), c.lines);
-    else for (const segs of c.lines) this.print({ segs }); // not ours after all: give it back
+    // Not ours after all: give the lines back to the normal handler, so room tags and the map are
+    // still recognised rather than printed raw.
+    else for (const segs of c.lines) this.line(segs, false);
     if (!this.capture) this.nextCapture(); // the callback may already have started the next one
   }
 

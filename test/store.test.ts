@@ -180,5 +180,22 @@ g3.onMessage({ t: 'text', d: '{eqdata}\r\n77,M,a leather cap,1,7,0,1,-1\r\n{/eqd
 await tick();
 assert.deepEqual(g3.state.equipment.map((i) => i.plainName), ['a leather cap']);
 assert.ok(!g3.state.lines.some((l) => plain(l.segs).includes('eqdata')));
+// A background lookup that times out hands its lines back: they must still be parsed, not shown raw.
+{
+  const g4 = new Game();
+  g4.attach(() => {});
+  g4.onMessage({ t: 'status', connected: true });
+  g4.onMessage({ t: 'gmcp', pkg: 'char.base', data: { name: 'Zeb' } });
+  (g4 as any).captureReply('look', /^\s*\{rname\}/, () => assert.fail('should not match'));
+  g4.onMessage({ t: 'text', d: '{rname}Before the Moonrift\r\n{coords}6,5,6\r\n{rdesc}\r\nA nexus of moons.\r\n{/rdesc}\r\n<MAPSTART>\r\n  *  \r\n<MAPEND>\r\n{exits}[ Exits: north ]\r\n' });
+  await tick();
+  assert.ok((g4 as any).capture?.started, 'lookup was holding the lines');
+  (g4 as any).endCapture(false);
+  await tick();
+  const shown = g4.state.lines.map((l) => plain(l.segs));
+  assert.ok(shown.includes('Before the Moonrift'), 'room name shown');
+  assert.ok(!shown.some((t) => /\{\/?(rname|coords|rdesc|exits)\}|<MAP(START|END)>/.test(t)), `no raw tags: ${JSON.stringify(shown)}`);
+  assert.deepEqual(g4.state.roomDesc, ['A nexus of moons.']);
+}
 console.log('store tests passed');
 process.exit(0);
