@@ -3,6 +3,8 @@ import { useSyncExternalStore } from 'react';
 import { AnsiParser, plain, type Seg } from './ansi.ts';
 import { aardSegs, stripAard } from './aardColor.ts';
 import { Mapper, type RoomInfo } from './mapper.ts';
+import { labelGrid, parseAsciiMap } from './asciiMap.ts';
+import { LASTING } from './mapStyle.ts';
 import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, type Target, type Team } from './lasertag.ts';
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
 
@@ -337,7 +339,7 @@ export class Game {
     const marker = /^\s*<MAP(START|END)>\s*$/.exec(text);
     if (marker) {
       if (marker[1] === 'START') this.mapBlock = [];
-      else if (this.mapBlock) { this.set({ asciiMap: trimBlankLines(this.mapBlock) }); this.mapBlock = null; }
+      else if (this.mapBlock) { this.set({ asciiMap: trimBlankLines(this.mapBlock) }); this.mapBlock = null; this.noteMapMarks(); }
       return;
     }
     if (this.mapBlock) this.mapBlock.push(segs);
@@ -466,6 +468,20 @@ export class Game {
     this.mirror = null;
     clearTimeout(m.timer);
     m.cb(m.lines);
+  }
+
+  /** Remember shops and clan halls seen on Aardwolf's map, so the area map can show them later. */
+  private noteMapMarks() {
+    const room = this.state.room;
+    const grid = room && parseAsciiMap(this.state.asciiMap.map(plain));
+    if (!room || !grid) return;
+    let changed = false;
+    for (const [k, num] of labelGrid(grid, room, this.mapper)) {
+      const c = grid.byPos.get(k)!.contents;
+      if (LASTING.has(c)) changed = this.mapper.setMark(num, c) || changed;
+      else if (c === ' ') changed = this.mapper.setMark(num, undefined) || changed; // seen empty: it's gone
+    }
+    if (changed) this.set({ mapVersion: this.state.mapVersion + 1 });
   }
 
   ltScan() { this.mirrorReply('scan', (lines) => this.lt({ targets: parseScan(lines), scanAt: Date.now() })); }

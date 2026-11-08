@@ -4,6 +4,7 @@ import { plain } from '../lib/ansi.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { gridPath, key, labelGrid, parseAsciiMap, type GridCell } from '../lib/asciiMap.ts';
 import { terrainIcon } from './ui.tsx';
+import { CONTENT_STYLE } from '../lib/mapStyle.ts';
 
 const CELL = 40;
 const TILE = 30;
@@ -14,7 +15,8 @@ const BRACKET_TERRAIN: Record<string, string> = {
   ';;': 'hills', '%%': 'cave', '##': 'dungeon', '(*': 'forest', '**': 'shop',
 };
 const CONTENT_ICON: Record<string, [string, string]> = {
-  '#': ['my_location', '#4d2600'], '$': ['storefront', '#ffd479'], '!': ['pets', '#ff7b6b'], '*': ['person', '#8cb8f0'], '?': ['door_open', '#7fdcd8'],
+  '#': ['my_location', '#4d2600'],
+  ...Object.fromEntries(Object.entries(CONTENT_STYLE).map(([c, v]) => [c, [v.icon, v.color] as [string, string]])),
 };
 
 /** Aardwolf's map, parsed into walkable tiles; known rooms are named, the rest are ghosts. */
@@ -48,7 +50,7 @@ export function GridMap() {
         const known = id !== undefined ? game.mapper.rooms.get(id) ?? (here ? room : undefined) : undefined;
         const [icon, color] = CONTENT_ICON[c.contents] ?? [terrainIcon(known?.terrain ?? BRACKET_TERRAIN[c.terrain] ?? ''), known ? '#cfc6bd' : '#a38c7c'];
         const name = known?.name ?? (id !== undefined ? `Room #${id} (not visited)` : 'Unexplored room');
-        const what = { '$': ' · shop', '!': ' · creature here', '*': ' · player here' }[c.contents] ?? '';
+        const what = CONTENT_STYLE[c.contents] ? ` · ${CONTENT_STYLE[c.contents].label}` : '';
         return (
           <g key={key(c.x, c.y)} transform={`translate(${cx(c) - TILE / 2},${cy(c) - TILE / 2})`} onClick={() => walk(c)}
             className={here ? '' : 'cursor-pointer [&:hover>rect]:stroke-[#ffb77d]'}>

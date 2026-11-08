@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
 import { DIRS, DIR_NAMES } from '../lib/mapper.ts';
 import { Icon, terrainIcon } from './ui.tsx';
+import { plain } from '../lib/ansi.ts';
+import { labelGrid, parseAsciiMap } from '../lib/asciiMap.ts';
+import { CONTENT_STYLE } from '../lib/mapStyle.ts';
 
 const CELL = 64; // world units between room centres
 const TILE = 36;
@@ -15,9 +18,16 @@ interface View { k: number; x: number; y: number }
  * ghost rooms. Drag to pan, scroll or the buttons to zoom, click a room to walk there.
  */
 export function AreaMap() {
-  const { room, mapVersion } = useGame();
+  const { room, mapVersion, asciiMap } = useGame();
   const map = game.mapper;
   const layout = useMemo(() => (room ? map.areaLayout(room.num) : null), [room?.num, mapVersion]);
+  // Who/what is in each room right now, from Aardwolf's live map around you.
+  const live = useMemo(() => {
+    const grid = parseAsciiMap(asciiMap.map(plain));
+    const out = new Map<number, string>();
+    if (grid && room) for (const [k, num] of labelGrid(grid, room, map)) out.set(num, grid.byPos.get(k)!.contents);
+    return out;
+  }, [asciiMap, room, mapVersion]);
   const box = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [view, setView] = useState<View | null>(null);
@@ -113,6 +123,9 @@ export function AreaMap() {
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-primary" /> you</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm border border-dashed border-[#6d5a4c]" /> not visited</span>
         <span className="flex items-center gap-1"><span className="inline-block w-4 border-t-2 border-dashed border-secondary" /> to another area</span>
+        {Object.values(CONTENT_STYLE).map((c) => (
+          <span key={c.icon} className="flex items-center gap-0.5"><Icon name={c.icon} className="text-sm" style={{ color: c.color }} />{c.label.replace(' here', '')}</span>
+        ))}
         <span className="ml-auto flex items-center gap-1">
           <button className="btn px-1.5" onClick={() => zoom(1 / 1.25)} aria-label="Zoom out" title="Zoom out"><Icon name="remove" className="text-sm" /></button>
           <span className="font-mono w-10 text-center">{Math.round(k * 100)}%</span>
@@ -164,18 +177,20 @@ export function AreaMap() {
                 const r = map.rooms.get(n.num);
                 const here = n.num === room.num;
                 const vertical = r ? ['u', 'd'].filter((d) => d in r.exits).join('') : '';
+                const what = CONTENT_STYLE[live.get(n.num) ?? ''] ?? CONTENT_STYLE[r?.mark ?? ''];
                 const name = r?.name ?? `Unexplored (${DIR_NAMES[n.dir ?? ''] ?? '?'} of ${map.rooms.get(n.from ?? -1)?.name ?? '?'})`;
                 return (
                   <g key={n.num} transform={`translate(${n.x * CELL - TILE / 2},${n.y * CELL - TILE / 2})`}
                     onClick={() => walkTo(n.num)} className={here ? '' : 'cursor-pointer [&:hover>rect]:stroke-[#ffb77d]'}>
-                    <title>{`${name}${here ? ' — you are here' : ' — click to walk'}`}</title>
+                    <title>{`${name}${what ? ` · ${what.label}` : ''}${here ? ' — you are here' : ' — click to walk'}`}</title>
                     <rect width={TILE} height={TILE} rx={8}
                       fill={here ? '#ffb77d' : n.ghost ? 'rgba(43,42,40,0.35)' : '#2b2a28'}
                       stroke={here ? '#ffdcc3' : n.ghost ? '#6d5a4c' : '#4a4542'}
                       strokeWidth={here ? 2.5 : 1.25} strokeDasharray={n.ghost ? '3 3' : undefined} />
-                    {!n.ghost && (
-                      <text x={TILE / 2} y={TILE / 2 + 1} textAnchor="middle" dominantBaseline="central" className="msi" fontSize={20} fill={here ? '#4d2600' : '#cfc6bd'}>
-                        {here ? 'my_location' : terrainIcon(r?.terrain ?? '')}
+                    {(!n.ghost || what) && (
+                      <text x={TILE / 2} y={TILE / 2 + 1} textAnchor="middle" dominantBaseline="central" className="msi" fontSize={20}
+                        fill={here ? '#4d2600' : what?.color ?? '#cfc6bd'}>
+                        {here ? 'my_location' : what?.icon ?? terrainIcon(r?.terrain ?? '')}
                       </text>
                     )}
                     {vertical && (

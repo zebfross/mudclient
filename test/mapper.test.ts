@@ -28,4 +28,12 @@ add(10, { e: 11, s: 12 }, 'maze'); add(11, { w: 10, s: 13 }, 'maze'); add(12, { 
 add(13, { n: 11 }, 'maze'); add(14, { w: 12 }, 'maze');
 const b = m.areaLayout(10);
 assert.equal(b.nodes.length, 4, '13 and 14 both want (1,1); first one wins');
+// Shop marks survive GMCP updates for the same room, and can be cleared.
+assert.equal(m.setMark(1, '$'), true);
+assert.equal(m.setMark(1, '$'), false, 'no change');
+m.add({ num: 1, name: 'R1', zone: 'town', terrain: 'city', details: '', exits: { e: 2 } });
+assert.equal(m.rooms.get(1)!.mark, '$');
+m.setMark(1, undefined);
+assert.equal(m.rooms.get(1)!.mark, undefined);
+assert.equal(m.setMark(999, '$'), false, 'unknown room');
 console.log('mapper tests passed');

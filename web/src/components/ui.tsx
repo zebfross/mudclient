@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import type { Seg } from '../lib/ansi.ts';
 
-export const Icon = ({ name, className = '' }: { name: string; className?: string }) => (
-  <span className={`msi ${className}`} aria-hidden>{name}</span>
+export const Icon = ({ name, className = '', style }: { name: string; className?: string; style?: React.CSSProperties }) => (
+  <span className={`msi ${className}`} style={style} aria-hidden>{name}</span>
 );
 
 export function SegText({ segs }: { segs: Seg[] }) {

@@ -9,6 +9,8 @@ export interface RoomInfo {
   details: string;
   exits: Record<string, number>;
   coord?: { id: number; x: number; y: number; cont: number };
+  /** Lasting feature seen on Aardwolf's map: '$' shop, '?' clan hall exit. */
+  mark?: string;
 }
 
 const KEY = 'gaslamp.rooms.v1';
@@ -27,7 +29,21 @@ export class Mapper {
   }
 
   add(r: RoomInfo) {
-    this.rooms.set(r.num, { ...r, name: stripAard(r.name) });
+    const mark = this.rooms.get(r.num)?.mark;
+    this.rooms.set(r.num, { ...r, name: stripAard(r.name), ...(mark ? { mark } : {}) });
+    this.save();
+  }
+
+  /** Remember (or forget) a room's lasting map feature. Returns true if it changed. */
+  setMark(num: number, mark: string | undefined) {
+    const r = this.rooms.get(num);
+    if (!r || r.mark === mark) return false;
+    if (mark) r.mark = mark; else delete r.mark;
+    this.save();
+    return true;
+  }
+
+  private save() {
     clearTimeout(this.saveTimer);
     this.saveTimer = setTimeout(() => {
       try { localStorage.setItem(KEY, JSON.stringify([...this.rooms.values()])); } catch { /* quota */ }
