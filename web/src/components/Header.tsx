@@ -36,7 +36,7 @@ function Need({ kind, value }: { kind: 'hunger' | 'thirst'; value?: number }) {
   const tip = v === undefined ? `${what}: unknown` : `${what}: ${v}% · ${fullness(kind, v)}${warn ? (kind === 'hunger' ? ' (eat something)' : ' (drink something)') : ''}`;
   return (
     <div className="flex items-center gap-1" title={tip} aria-label={tip}>
-      <Icon name={kind === 'hunger' ? 'restaurant' : 'water_drop'} className={`text-sm ${tone} ${low ? 'animate-pulse' : ''}`} />
+      <Icon name={kind === 'hunger' ? 'restaurant' : 'water_drop'} className={`text-sm ${tone}`} />
       <div className="w-8"><Bar value={v ?? 0} max={100} className={bar} track={low ? 'bg-[#d4574a]/25' : undefined} /></div>
       <span className={`font-mono text-[10px] tabular-nums w-7 ${warn ? tone : 'text-on-surface-variant'}`}>{v === undefined ? '–' : `${v}%`}</span>
     </div>
