@@ -63,8 +63,8 @@ export function Automap() {
         <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-3 sm:p-6 flex" onMouseDown={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}>
           <section className="card p-4 flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full" role="dialog" aria-label="Large map">
             <CardHead icon="map" title={`Area map${room?.zone ? ` · ${room.zone}` : ''}`} right={
-              <button onClick={() => setExpanded(false)} title="Close (Esc)" aria-label="Close large map"
-                className="p-1 rounded border bg-primary/20 text-primary border-primary/40"><Icon name="close_fullscreen" className="text-base" /></button>
+              <span className="flex items-center gap-3"><Coords className="text-xs" /><button onClick={() => setExpanded(false)} title="Close (Esc)" aria-label="Close large map"
+                className="p-1 rounded border bg-primary/20 text-primary border-primary/40"><Icon name="close_fullscreen" className="text-base" /></button></span>
             } />
             <AreaMap />
           </section>
@@ -151,10 +151,24 @@ function MapFrame({ mode }: { mode: Mode }) {
           )}
         </div>
         <DirButton dir="e" />
-        <span />
+        <Coords />
         <DirButton dir="s" />
         <DirButton dir="d" />
       </div>
+  );
+}
+
+/** The current room's map coordinates (Aardwolf's x,y within the area or continent). */
+export function Coords({ className = '' }: { className?: string }) {
+  const { room } = useGame();
+  const c = room?.coord;
+  if (!c || c.x < 0 || c.y < 0) return <span />;
+  const tip = `Coordinates ${c.x}, ${c.y}${c.cont ? ' on the continent' : ` in ${room?.zone ?? 'this area'}`}`;
+  return (
+    <span title={tip} aria-label={tip}
+      className={`flex items-center gap-0.5 font-mono text-[10px] text-outline tabular-nums whitespace-nowrap ${className}`}>
+      <Icon name="my_location" className="text-[11px]" />{c.x},{c.y}
+    </span>
   );
 }
 
