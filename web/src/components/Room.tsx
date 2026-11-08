@@ -49,16 +49,6 @@ export function RoomHeader() {
   );
 }
 
-export function RoomDescription() {
-  const { roomDesc } = useGame();
-  if (!roomDesc.length) return null;
-  return (
-    <p className="text-sm text-on-surface leading-relaxed border-l-2 border-primary/60 pl-3 italic p-2.5 rounded-r shadow-inner bg-surface-lowest/40">
-      {roomDesc.join(' ')}
-    </p>
-  );
-}
-
 export function Souls({ bare = false }: { bare?: boolean }) {
   const { roomChars, loggedIn } = useGame();
   return (

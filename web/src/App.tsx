@@ -1,7 +1,7 @@
 import { useGame } from './lib/store.ts';
 import { Header } from './components/Header.tsx';
 import { Terminal } from './components/Terminal.tsx';
-import { DeathBanner, RoomDescription, RoomHeader } from './components/Room.tsx';
+import { DeathBanner, RoomHeader } from './components/Room.tsx';
 import { CommandBar } from './components/CommandBar.tsx';
 import { Sky } from './components/Sky.tsx';
 import { SignIn } from './components/SignIn.tsx';
@@ -25,7 +25,6 @@ export function App() {
               <RoomHeader />
               <section className="card p-3 sm:p-5 border-primary/30 flex flex-col gap-3.5 min-w-0">
                 <CardHead icon="history_edu" title="Chronicle" right={<span className="label-caps text-outline font-medium">Live</span>} />
-                <RoomDescription />
                 <Terminal />
               </section>
             </div>
