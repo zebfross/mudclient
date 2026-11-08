@@ -260,7 +260,7 @@ export class Game {
 
   onMessage(msg: any) {
     this.trace.push({ at: Date.now(), msg });
-    if (this.trace.length > 400) this.trace.shift();
+    if (this.trace.length > 8000) this.trace.shift();
     switch (msg.t) {
       case 'status':
         this.set({ connected: msg.connected, status: msg.msg ?? (msg.connected ? 'Connected' : 'Disconnected') });
