@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { game, useGame } from '../lib/store.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { CardHead, Empty, Icon, SegText, terrainIcon } from './ui.tsx';
@@ -6,7 +7,8 @@ import { GridMap } from './GridMap.tsx';
 import { parseAsciiMap } from '../lib/asciiMap.ts';
 import { plain } from '../lib/ansi.ts';
 
-const R = 3;           // grid radius in rooms
+const R_SMALL = 3;     // grid radius in rooms
+const R_BIG = 6;       // radius in the expanded view
 const CELL = 40;       // px per grid step
 const TILE = 32;       // px tile size
 const DIR_VEC: Record<string, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
@@ -16,27 +18,20 @@ const MODE_KEY = 'gaslamp.mapMode';
 const loadMode = (): Mode => { try { return localStorage.getItem(MODE_KEY) === 'charted' ? 'charted' : 'aard'; } catch { return 'aard'; } };
 
 export function Automap() {
-  const { room, mapVersion, asciiMap, loggedIn } = useGame();
+  const { room, loggedIn } = useGame();
   const [mode, setMode] = useState<Mode>(loadMode);
-  const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
+  const [expanded, setExpanded] = useState(false);
   const choose = (m: Mode) => { setMode(m); try { localStorage.setItem(MODE_KEY, m); } catch { /* ignore */ } };
   const map = game.mapper;
-  const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion]);
-  const size = (R * 2 + 1) * CELL;
-  const px = (v: number) => (v + R) * CELL + CELL / 2;
 
-  const go = (target: number) => {
-    if (!room) return;
-    const path = map.path(room.num, target);
-    if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
-  };
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setExpanded(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [expanded]);
 
-  return (
-    <section className="card p-4">
-      <CardHead
-        icon="explore"
-        title="Automap"
-        right={
+  const controls = (
           <div className="flex items-center gap-1" role="group" aria-label="Map view">
             {([['aard', 'grid_on', "Aardwolf's map"], ['charted', 'hub', `Charted by you (${map.size} ${map.size === 1 ? 'room' : 'rooms'}), click to walk`]] as const).map(([m, icon, label]) => (
               <button key={m} onClick={() => choose(m)} title={label} aria-label={label} aria-pressed={mode === m}
@@ -50,25 +45,65 @@ export function Automap() {
                 <Icon name="refresh" className="text-base" />
               </button>
             )}
-          </div>
-        }
-      />
-      <div className="rounded-lg border border-surface-high/40 bg-surface-lowest/80 shadow-inner p-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_1fr_auto] items-center justify-items-center gap-1">
+            <button onClick={() => setExpanded(!expanded)} title={expanded ? 'Close large map (Esc)' : 'Expand map'} aria-label={expanded ? 'Close large map' : 'Expand map'}
+              className={`p-1 rounded border ${expanded ? 'bg-primary/20 text-primary border-primary/40' : 'text-outline border-surface-high/40 hover:text-on-surface'}`}>
+              <Icon name={expanded ? 'close_fullscreen' : 'open_in_full'} className="text-base" />
+            </button>
+    </div>
+  );
+
+  return (
+    <>
+      <section className="card p-4">
+        <CardHead icon="explore" title="Automap" right={controls} />
+        <MapFrame mode={mode} />
+      </section>
+      {/* Portal: the sidebar is sticky, which would trap the overlay under the header and command bar. */}
+      {expanded && createPortal(
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-sm p-3 sm:p-6 flex" onMouseDown={(e) => { if (e.target === e.currentTarget) setExpanded(false); }}>
+          <section className="card p-4 flex-1 flex flex-col min-h-0 max-w-6xl mx-auto w-full" role="dialog" aria-label="Large map">
+            <CardHead icon="explore" title={room?.name ?? 'Automap'} right={controls} />
+            <MapFrame mode={mode} big />
+          </section>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function MapFrame({ mode, big = false }: { mode: Mode; big?: boolean }) {
+  const { room, mapVersion, asciiMap, loggedIn } = useGame();
+  const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
+  const map = game.mapper;
+  const R = big ? R_BIG : R_SMALL;
+  const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion, R]);
+  const size = (R * 2 + 1) * CELL;
+  const px = (v: number) => (v + R) * CELL + CELL / 2;
+
+  const go = (target: number) => {
+    if (!room) return;
+    const path = map.path(room.num, target);
+    if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
+  };
+
+  return (
+      <div className={`rounded-lg border border-surface-high/40 bg-surface-lowest/80 shadow-inner p-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] items-center justify-items-center gap-1 ${big ? 'flex-1 min-h-0 mt-1' : ''}`}>
         <span />
         <DirButton dir="n" />
         <DirButton dir="u" />
         <DirButton dir="w" />
-        <div className="w-full min-w-0 flex justify-center overflow-x-auto scroll-thin py-1">
+        <div className={`w-full min-w-0 flex justify-center items-center overflow-auto scroll-thin py-1 ${big ? 'h-full' : ''}`}>
           {mode === 'aard' ? (
             asciiMap.length === 0 ? (
               <Empty>{loggedIn ? 'Drawing the map…' : "Aardwolf's map of your surroundings appears here."}</Empty>
             ) : (
-              <pre className="font-mono text-[12px] leading-[1.2] text-[#cfc6bd] select-text">
+              <pre className={`font-mono leading-[1.2] text-[#cfc6bd] select-text ${big ? 'text-[clamp(14px,3.2vh,30px)]' : 'text-[12px]'}`}>
                 {asciiMap.map((l, i) => <div key={i} className="min-h-[1lh]"><SegText segs={l} /></div>)}
               </pre>
             )
           ) : hasGrid ? (
-            <GridMap />
+            <GridMap big={big} />
           ) : !layout || layout.nodes.length === 0 ? (
             <Empty>The map fills in as you walk. Rooms are remembered in this browser.</Empty>
           ) : (
@@ -118,7 +153,6 @@ export function Automap() {
         <DirButton dir="s" />
         <DirButton dir="d" />
       </div>
-    </section>
   );
 }
 
