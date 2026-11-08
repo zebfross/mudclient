@@ -81,6 +81,7 @@ const g2 = new Game();
 const sent2: any[] = [];
 g2.attach((m) => sent2.push(m));
 g2.refreshNotes = () => {}; // this scripted session never answers note lookups
+g2.syncTime = () => {};
 g2.onMessage({ t: 'gmcp', pkg: 'char.base', data: { name: 'Zeb' } });
 g2.onMessage({ t: 'text', d: 'Welcome.\r\n[158/158hp] > ' });
 assert.deepEqual(sent2.filter((m) => m.t === 'cmd'), []);

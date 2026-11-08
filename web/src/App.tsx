@@ -3,6 +3,7 @@ import { Header } from './components/Header.tsx';
 import { Terminal } from './components/Terminal.tsx';
 import { DeathBanner, RoomDescription, RoomHeader } from './components/Room.tsx';
 import { CommandBar } from './components/CommandBar.tsx';
+import { Sky } from './components/Sky.tsx';
 import { Sidebar } from './components/Sidebar.tsx';
 import { CardHead, terrainTint } from './components/ui.tsx';
 
@@ -11,6 +12,7 @@ export function App() {
   return (
     <>
       <div className="backdrop" style={{ ['--tint' as string]: terrainTint(room?.terrain) }} />
+      <Sky />
       <Header />
       <main className="relative z-10 w-full pt-20 pb-4">
         <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

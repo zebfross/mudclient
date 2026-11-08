@@ -85,3 +85,31 @@
 }
 @keyframes fog { from { transform: translate3d(-4%, 0, 0); } to { transform: translate3d(4%, -2%, 0); } }
 @media (prefers-reduced-motion: reduce) { .backdrop::after { animation: none; } }
+
+/* Day/night sky from the game clock (Sky.tsx). Subtle: it sits under translucent cards. */
+.sky { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.sky-layer { position: absolute; inset: 0; transition: opacity 6s ease; }
+.sky-day {
+  background:
+    radial-gradient(circle at var(--across) 4%, rgba(255, 214, 140, 0.38), rgba(255, 190, 110, 0.12) 20%, transparent 48%),
+    linear-gradient(180deg, rgba(130, 165, 195, 0.18), rgba(130, 165, 195, 0.05) 50%, transparent 75%);
+}
+.sky-dawn {
+  background:
+    radial-gradient(ellipse 75% 45% at 10% 0%, rgba(255, 150, 130, 0.30), transparent 70%),
+    linear-gradient(180deg, rgba(200, 130, 160, 0.20), transparent 60%);
+}
+.sky-dusk {
+  background:
+    radial-gradient(ellipse 75% 45% at 92% 0%, rgba(255, 140, 70, 0.30), transparent 70%),
+    linear-gradient(180deg, rgba(120, 80, 150, 0.26), transparent 65%);
+}
+.sky-night {
+  background:
+    radial-gradient(circle at var(--across) 7%, rgba(220, 230, 255, 0.30), rgba(170, 190, 240, 0.08) 10%, transparent 24%),
+    linear-gradient(180deg, rgba(30, 50, 105, 0.55), rgba(18, 26, 55, 0.30) 55%, rgba(10, 14, 30, 0.15));
+}
+.sky-stars { position: absolute; inset: 0; transition: opacity 6s ease; }
+.sky-stars circle { animation: twinkle 6s ease-in-out infinite; opacity: 0.85; }
+@keyframes twinkle { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.3; } }
+@media (prefers-reduced-motion: reduce) { .sky-stars circle { animation: none; } }

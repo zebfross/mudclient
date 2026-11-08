@@ -13,7 +13,12 @@ export function Notes() {
   const { open, reading, forum, posts, boards, loading } = notes;
   const isForum = (name: string) => name.toLowerCase() === forum.toLowerCase();
   // Personal first, then any board with something unread.
-  const chips = boards.filter((b) => b.name.toLowerCase() === 'personal' || b.unread > 0 || isForum(b.name))
+  // `board` only lists boards with unread posts, so Personal and the open board are added when missing.
+  const listed = [...boards];
+  for (const name of ['Personal', forum]) {
+    if (!listed.some((b) => b.name.toLowerCase() === name.toLowerCase())) listed.unshift({ num: -listed.length - 1, name, unread: 0, desc: '' });
+  }
+  const chips = listed.filter((b) => b.name.toLowerCase() === 'personal' || b.unread > 0 || isForum(b.name))
     .sort((a, b) => Number(b.name.toLowerCase() === 'personal') - Number(a.name.toLowerCase() === 'personal'));
 
   const refresh = (

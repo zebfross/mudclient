@@ -6,6 +6,7 @@ import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
 import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
 import { DETAIL_TYPES, parseInvDetails, type ItemDetails } from './items.ts';
+import { SUN_EVENTS, emptyClock, parseTimeLine, type GameClock } from './gameTime.ts';
 import { parseBoards, parseNote, parseNoteList, type Board, type Note, type Post } from './notes.ts';
 
 export interface NotesState {
@@ -61,6 +62,7 @@ export interface State {
   mapVersion: number;
   objectives: Objectives;
   notes: NotesState;
+  clock: GameClock;
   asciiMap: Seg[][];
   /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
   death: { at: number } | null;
@@ -102,7 +104,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), asciiMap: [], death: null, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -273,6 +275,29 @@ export class Game {
 
   gmcp(pkg: string, data?: unknown) { this.sendRaw({ t: 'gmcp', pkg, data }); }
 
+  /** Quietly read the game clock; ticks keep it going from there. */
+  syncTime() {
+    if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'time')) return;
+    this.captureReply('time', /^\s*\*\s*It is /, (lines) => { for (const l of lines) this.noteTime(l); });
+  }
+
+  /** A `time` reply or a sunrise/sunset message sets the clock. */
+  private noteTime(text: string) {
+    const t = parseTimeLine(text);
+    if (t) { this.set({ clock: { ...t, syncedAt: Date.now() } }); return; }
+    const sun = SUN_EVENTS.find(([re]) => re.test(text));
+    if (sun) this.set({ clock: { ...this.state.clock, hour: sun[1], syncedAt: Date.now() } });
+  }
+
+  /** One tick is one game hour. A new day re-reads the calendar (seasons roll over). */
+  private tick() {
+    const c = this.state.clock;
+    if (c.hour === undefined) return;
+    const hour = (c.hour + 1) % 24;
+    this.set({ clock: { ...c, hour, day: hour === 0 && c.day !== undefined ? c.day + 1 : c.day } });
+    if (hour === 0) this.syncTime();
+  }
+
   private notesTimer: ReturnType<typeof setTimeout> | undefined;
   private patchNotes(p: Partial<NotesState>) { this.set({ notes: { ...this.state.notes, ...p } }); }
 
@@ -425,6 +450,7 @@ export class Game {
     }
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
+    this.noteTime(text);
     if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
     if (this.mirror) this.mirror.lines.push(text);
     const news = /^\s*Lasertag\s*:\s*(.+)$/.exec(text);
@@ -496,6 +522,7 @@ export class Game {
     }
     const p = pkg.toLowerCase();
     const char = this.state.char;
+    if (p === 'comm.tick') return this.tick();
     if (p === 'char.base') this.set({ char: { ...char, base: data } });
     else if (p === 'char.vitals') this.set({ char: { ...char, vitals: { hp: num(data.hp), mana: num(data.mana), moves: num(data.moves) } } });
     else if (p === 'char.maxstats') this.set({ char: { ...char, maxstats: mapNums(data) } });
@@ -671,6 +698,7 @@ export class Game {
     setTimeout(() => this.refreshObjectives(), 1200);
     this.refreshMap(1600);
     setTimeout(() => this.refreshNotes(), 2200);
+    setTimeout(() => this.syncTime(), 2600);
   }
 }
 
