@@ -18,6 +18,34 @@ export interface NotesState {
   reading?: number;
   loading: boolean;
   at: number;
+  /** Writing a note through Aardwolf's note editor, step by step. */
+  compose?: { stage: 'starting' | 'to' | 'subject' | 'checking' | 'body' | 'posting' | 'posted' | 'error'; error?: string };
+}
+export interface NoteDraft { to: string; subject: string; body: string }
+// Aardwolf's exact wording isn't documented, so these are deliberately broad.
+const NOTE_REFUSED_RE = /not found|no such|no one|nobody|invalid|cannot|can't|unable|not allowed|you must|huh\?/i;
+const NOTE_POSTED_RE = /note (?:has been |was )?(?:posted|sent)|posted (?:to|on)|your note (?:has|is)|added to the/i;
+
+/**
+ * A note body as editor lines: wrapped to fit, blank edges trimmed. A line that the editor would
+ * read as a command ('.q', '.p', 'end'…) gets a leading space so it stays text.
+ */
+export function noteLines(body: string, width = 76): string[] {
+  const out: string[] = [];
+  for (const raw of body.replace(/\r/g, '').split('\n')) {
+    let line = raw.replace(/\s+$/, '');
+    if (!line.trim()) { out.push(' '); continue; }
+    while (line.length > width) {
+      const cut = line.lastIndexOf(' ', width);
+      const at = cut > width / 2 ? cut : width;
+      out.push(line.slice(0, at));
+      line = line.slice(at).replace(/^ /, '');
+    }
+    out.push(line);
+  }
+  while (out.length && !out[0].trim()) out.shift();
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out.map((l) => (/^\s*(?:\.|end\s*$)/i.test(l) && !l.startsWith(' ') ? ` ${l}` : l));
 }
 const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: [], open: null, loading: false, at: 0 });
 // e.g. Aaeron says, "I have sent a personal note to you…" / "A new note has been posted…"
@@ -217,7 +245,7 @@ export class Game {
 
   /** Send a command whose next prompt should not be shown. */
   private hidden(cmd: string) {
-    if (this.gameDown) return;
+    if (this.gameDown || this.writer) return; // in the note editor it would become a line of the note
     if (Date.now() > this.suppressPromptsUntil) this.suppressPrompts = 0;
     this.suppressPrompts++;
     this.suppressPromptsUntil = Date.now() + 3000;
@@ -239,6 +267,11 @@ export class Game {
    */
   private gameDown = false; // the relay told us the game connection closed (and no new one yet)
   private dropBackgroundWork() {
+    if (this.writer) {
+      clearTimeout(this.writer.timer);
+      this.writer = null;
+      this.patchNotes({ compose: { stage: 'error', error: 'The connection closed while writing the note.' } });
+    }
     if (this.capture) { clearTimeout(this.capture.timer); this.capture = null; }
     this.captureQueue = [];
     this.suppressPrompts = 0;
@@ -255,6 +288,7 @@ export class Game {
   }
 
   private nextCapture() {
+    if (this.writer) return; // held until the note is posted: anything sent now would land in the note
     const next = this.captureQueue.shift();
     if (!next) return;
     this.capture = { cb: next.cb, start: next.start, end: next.end, started: false, lines: [], timer: setTimeout(() => this.endCapture(false), 5000) };
@@ -437,6 +471,100 @@ export class Game {
   }
   closeNote() { this.patchNotes({ open: null, reading: undefined }); }
 
+  /**
+   * Write a note on the Personal board through Aardwolf's note editor ('note write <to>', a subject
+   * prompt, the body line by line, then '.p'). Each step waits until the game shows it's ready, and
+   * '.s' confirms we're really in the editor before any of the body is sent, so the note's text can
+   * never be taken as game commands.
+   */
+  writeNote(draft: NoteDraft) {
+    const to = draft.to.trim(), subject = draft.subject.replace(/\s+/g, ' ').trim();
+    if (!this.state.loggedIn || this.writer || !to || !subject || !draft.body.trim()) return;
+    this.patchNotes({ compose: { stage: 'starting' } });
+    this.captureReply('forum personal', /forum/i, (lines) => {
+      if (!lines.some((l) => /personal/i.test(l))) return this.noteFailed('Couldn’t switch to the Personal board.');
+      this.writer = { stage: 'to', to, subject, body: noteLines(draft.body), seen: '', timer: undefined };
+      this.patchNotes({ compose: { stage: 'to' }, current: 'Personal' });
+      this.sendRaw({ t: 'cmd', d: `note write ${to}` });
+      this.writerTimeout();
+    });
+  }
+
+  private writer: { stage: 'to' | 'subject' | 'checking' | 'posting'; to: string; subject: string; body: string[]; seen: string; timer?: ReturnType<typeof setTimeout> } | null = null;
+
+  private writerTimeout(ms = 8000) {
+    const w = this.writer;
+    if (!w) return;
+    clearTimeout(w.timer);
+    w.timer = setTimeout(() => {
+      if (this.writer !== w) return;
+      this.noteFailed(w.stage === 'posting'
+        ? 'Aardwolf didn’t confirm the note was posted. Check the log, and the Personal board.'
+        : 'Aardwolf didn’t answer as expected, so nothing more was sent. If the log shows you’re in the note editor, type .q to cancel it.');
+    }, ms);
+  }
+
+  private noteFailed(error: string) {
+    if (this.writer) clearTimeout(this.writer.timer);
+    this.writer = null;
+    this.patchNotes({ compose: { stage: 'error', error } });
+    this.nextCapture();
+  }
+
+  /** Follow the note editor's replies (whole lines, and prompts that arrive without a newline). */
+  private watchWriter(text: string) {
+    const w = this.writer;
+    if (!w || !text.trim() || text === w.seen) return;
+    w.seen = text;
+    if (w.stage === 'to') {
+      if (/subject/i.test(text)) {
+        w.stage = 'subject';
+        this.patchNotes({ compose: { stage: 'subject' } });
+        this.sendRaw({ t: 'cmd', d: w.subject });
+        // Then ask the editor to show the note so far: only the real editor answers with our headers.
+        setTimeout(() => {
+          if (this.writer !== w) return;
+          w.stage = 'checking';
+          this.patchNotes({ compose: { stage: 'checking' } });
+          this.sendRaw({ t: 'cmd', d: '.s' });
+          this.writerTimeout();
+        }, 600);
+        this.writerTimeout();
+      } else if (NOTE_REFUSED_RE.test(text)) {
+        this.noteFailed(`Aardwolf said: ${text.trim()}`);
+      }
+    } else if (w.stage === 'checking') {
+      const m = /^\s*subject\s*:\s*(.*)$/i.exec(text);
+      if (m && m[1].trim().toLowerCase().startsWith(w.subject.slice(0, 20).toLowerCase())) {
+        w.stage = 'posting';
+        this.patchNotes({ compose: { stage: 'body' } });
+        for (const l of w.body) this.sendRaw({ t: 'cmd', d: l });
+        this.sendRaw({ t: 'cmd', d: '.p' });
+        this.patchNotes({ compose: { stage: 'posting' } });
+        this.writerTimeout(10000);
+      } else if (/huh\?|not (?:writing|in) a note|isn't a command|unknown command/i.test(text)) {
+        this.noteFailed('The note editor didn’t open, so the note wasn’t sent.');
+      }
+    } else if (w.stage === 'posting') {
+      if (NOTE_POSTED_RE.test(text)) {
+        clearTimeout(w.timer);
+        this.writer = null;
+        this.patchNotes({ compose: { stage: 'posted' } });
+        this.nextCapture();
+        setTimeout(() => this.refreshNotes('Personal'), 800);
+      }
+    }
+  }
+  cancelNoteWrite() {
+    const w = this.writer;
+    if (w && w.stage !== 'to') this.sendRaw({ t: 'cmd', d: '.q' });
+    if (w) clearTimeout(w.timer);
+    this.writer = null;
+    this.patchNotes({ compose: undefined });
+    this.nextCapture();
+  }
+  clearCompose() { if (!this.writer) this.patchNotes({ compose: undefined }); }
+
   private detailsPending = new Set<string>();
   /** Quietly look up stats for wearable items we haven't seen before (each id once; they're cached). */
   fetchItemDetails() {
@@ -513,6 +641,7 @@ export class Game {
       const t = plain(this.cur);
       if (NAME_PROMPT_RE.test(t) && t !== this.loginPartialSeen) { this.loginPartialSeen = t; this.watchLogin(t); }
     }
+    if (this.writer && this.cur.length) this.watchWriter(plain(this.cur));
     if (!this.sawGA && this.cur.length) {
       this.promptTimer = setTimeout(() => { if (this.cur.length) this.onPrompt(); }, 200);
     }
@@ -527,6 +656,7 @@ export class Game {
 
   private line(segs: Seg[], isPrompt: boolean) {
     const text = plain(segs);
+    if (this.writer) this.watchWriter(text);
     if (!this.state.loggedIn) {
       if (text === this.loginPartialSeen) this.loginPartialSeen = ''; // already handled as it arrived
       else this.watchLogin(text);
