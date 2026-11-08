@@ -29,6 +29,7 @@ export interface SeenCell {
 export type AreaNode = {
   num: number; x: number; y: number; ghost: boolean; from?: number; dir?: string;
   seen?: SeenCell; // set for rooms only known from Aardwolf's map
+  border?: string; // a visited room in another area, next to this one: its zone
 };
 export const DIRS: Record<string, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
 export const DIR_NAMES: Record<string, string> = { n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down' };
@@ -150,7 +151,7 @@ export class Mapper {
         if (!off) continue;
         const nx = x + off[0], ny = y + off[1];
         const target = this.rooms.get(to);
-        if (target && target.zone !== start.zone) continue;
+        const border = !!target && target.zone !== start.zone;
         const at = placed.get(to);
         if (at) {
           if (at[0] === nx && at[1] === ny) edge(num, to);
@@ -158,9 +159,9 @@ export class Mapper {
         }
         if (nodes.has(`${nx},${ny}`)) continue;
         placed.set(to, [nx, ny]);
-        nodes.set(`${nx},${ny}`, { num: to, x: nx, y: ny, ghost: !target, from: num, dir });
+        nodes.set(`${nx},${ny}`, { num: to, x: nx, y: ny, ghost: !target, from: num, dir, ...(border ? { border: target!.zone } : {}) });
         edge(num, to);
-        if (target) queue.push([to, nx, ny]);
+        if (target && !border) queue.push([to, nx, ny]);
       }
     }
 
@@ -170,7 +171,7 @@ export class Mapper {
     const byPos = (x: number, y: number) => nodes.get(`${x},${y}`);
     const added: [Node, SeenCell][] = [];
     for (const n of [...nodes.values()]) {
-      if (n.ghost) continue;
+      if (n.ghost || n.border) continue;
       for (const c of this.seen.get(n.num) ?? []) {
         const x = n.x + c.dx, y = n.y + c.dy;
         const there = byPos(x, y);

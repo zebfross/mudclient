@@ -44,7 +44,7 @@ export function AreaMap() {
 
   const nodes = layout?.nodes ?? [];
   const pos = useMemo(() => new Map(nodes.map((n) => [n.num, n])), [layout]);
-  const visited = nodes.filter((n) => !n.ghost).length;
+  const visited = nodes.filter((n) => !n.ghost && !n.border).length;
 
   // `view.x/y` is where *you* sit on screen (the layout is built around your room at 0,0).
   const centreOn = (k: number) => setView({ k, x: size.w / 2, y: size.h / 2 });
@@ -108,10 +108,11 @@ export function AreaMap() {
   const k = view?.k ?? 1;
   const showNames = k >= 0.9;
   const exitsOut = nodes.flatMap((n) => {
-    if (n.ghost) return [];
+    if (n.ghost || n.border) return [];
     const r = map.rooms.get(n.num);
+    // Exits to other areas whose room couldn't be drawn as a tile (its square was taken).
     return Object.entries(r?.exits ?? {})
-      .filter(([d, to]) => DIRS[d] && map.rooms.get(to) && map.rooms.get(to)!.zone !== layout.zone)
+      .filter(([d, to]) => DIRS[d] && map.rooms.get(to) && map.rooms.get(to)!.zone !== layout.zone && !pos.get(to)?.border)
       .map(([d, to]) => ({ n, d, to: map.rooms.get(to)! }));
   });
 
@@ -121,7 +122,7 @@ export function AreaMap() {
         <span className="font-mono">{visited} {visited === 1 ? 'room' : 'rooms'} explored{nodes.length > visited ? ` · ${nodes.length - visited} unexplored exits` : ''}</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-primary" /> you</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm border border-dashed border-[#6d5a4c]" /> not visited</span>
-        <span className="flex items-center gap-1"><span className="inline-block w-4 border-t-2 border-dashed border-secondary" /> to another area</span>
+        <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm border border-dashed border-secondary" /> another area</span>
         {Object.values(CONTENT_STYLE).map((c) => (
           <span key={c.icon} className="flex items-center gap-0.5"><Icon name={c.icon} className="text-sm" style={{ color: c.color }} />{c.label.replace(' here', '')}</span>
         ))}
@@ -161,7 +162,7 @@ export function AreaMap() {
                 const a = pos.get(e.from), b = pos.get(e.to);
                 if (!a || !b) return null;
                 return <line key={`${e.from}-${e.to}`} x1={a.x * CELL} y1={a.y * CELL} x2={b.x * CELL} y2={b.y * CELL}
-                  stroke="#6d5a4c" strokeWidth={3} strokeLinecap="round" strokeDasharray={a.ghost || b.ghost ? '4 5' : undefined} />;
+                  stroke="#6d5a4c" strokeWidth={3} strokeLinecap="round" strokeDasharray={a.ghost || b.ghost || a.border || b.border ? '4 5' : undefined} />;
               })}
               {exitsOut.map(({ n, d, to }) => {
                 const [dx, dy] = DIRS[d];
@@ -182,11 +183,11 @@ export function AreaMap() {
                 return (
                   <g key={n.num} transform={`translate(${n.x * CELL - TILE / 2},${n.y * CELL - TILE / 2})`}
                     onClick={() => walkTo(n.num)} className={here ? '' : 'cursor-pointer [&:hover>rect]:stroke-[#ffb77d]'}>
-                    <title>{`${name}${what ? ` · ${what.label}` : ''}${here ? ' — you are here' : ' — click to walk'}`}</title>
+                    <title>{`${name}${n.border ? ` (${n.border})` : ''}${what ? ` · ${what.label}` : ''}${here ? ' — you are here' : ' — click to walk'}`}</title>
                     <rect width={TILE} height={TILE} rx={8}
-                      fill={here ? '#ffb77d' : n.ghost ? 'rgba(43,42,40,0.35)' : '#2b2a28'}
-                      stroke={here ? '#ffdcc3' : n.ghost ? '#6d5a4c' : '#4a4542'}
-                      strokeWidth={here ? 2.5 : 1.25} strokeDasharray={n.ghost ? '3 3' : undefined} />
+                      fill={here ? '#ffb77d' : n.ghost ? 'rgba(43,42,40,0.35)' : n.border ? 'rgba(255,182,142,0.08)' : '#2b2a28'}
+                      stroke={here ? '#ffdcc3' : n.ghost ? '#6d5a4c' : n.border ? '#ffb68e' : '#4a4542'}
+                      strokeWidth={here ? 2.5 : n.border ? 1.5 : 1.25} strokeDasharray={n.ghost || n.border ? '3 3' : undefined} />
                     {(!n.ghost || what || terrain) && (
                       <text x={TILE / 2} y={TILE / 2 + 1} textAnchor="middle" dominantBaseline="central" className="msi" fontSize={20}
                         fill={here ? '#4d2600' : what?.color ?? (n.ghost ? '#6d5a4c' : '#cfc6bd')}>
@@ -195,6 +196,9 @@ export function AreaMap() {
                     )}
                     {vertical && (
                       <text x={TILE - 2} y={8} textAnchor="end" fontSize={9} fontWeight={700} fontFamily="JetBrains Mono, monospace" fill={here ? '#4d2600' : '#ffb68e'}>{vertical}</text>
+                    )}
+                    {n.border && (
+                      <text x={TILE / 2} y={-5} textAnchor="middle" fontSize={7.5} fontWeight={700} fill="#ffb68e" fontFamily="JetBrains Mono, monospace">{`→ ${n.border}`}</text>
                     )}
                     {showNames && r && (
                       <text x={TILE / 2} y={TILE + 10} textAnchor="middle" fontSize={8} fill={here ? '#ffdcc3' : '#a38c7c'} fontFamily="Plus Jakarta Sans, sans-serif">
