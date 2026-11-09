@@ -86,7 +86,7 @@ function MapFrame({ mode }: { mode: Mode }) {
   const go = (target: number) => {
     if (!room) return;
     const path = map.path(room.num, target);
-    if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
+    if (path?.length) game.walk(path);
   };
 
   return (

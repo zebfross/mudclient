@@ -98,7 +98,7 @@ export function AreaMap() {
     if (suppressClick.current || !room || num === room.num || !layout) return;
     // Visited rooms: known exits (including up/down). Anything else: along the lines drawn here.
     const path = map.rooms.has(num) ? map.path(room.num, num) : drawnPath(layout, room.num, num);
-    if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
+    if (path?.length) game.walk(path);
   };
 
   if (!room || !layout || nodes.length === 0) {

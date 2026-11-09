@@ -24,6 +24,14 @@ export interface NotesState {
 export interface NoteDraft { to: string; subject: string; body: string }
 // Aardwolf's exact wording isn't documented, so these are deliberately broad.
 const NOTE_REFUSED_RE = /not found|no such|no one|nobody|invalid|cannot|can't|unable|not allowed|you must|huh\?/i;
+const DIR_FULL: Record<string, string> = {
+  n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down',
+  north: 'north', south: 'south', east: 'east', west: 'west', up: 'up', down: 'down',
+};
+// "The door is closed." / "The iron gate is closed."
+const DOOR_CLOSED_RE = /^\s*The [\w' -]+ is closed\.\s*$/i;
+// Reasons a walk can't go on: stop, rather than send the rest of the route from the wrong room.
+const WALK_BLOCKED_RE = /^\s*(?:it'?s locked|the [\w' -]+ is locked|alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i;
 const NOTE_EDITOR_IN_RE = /^\s*You are now creating a new post|^\s*Enter your post\. Type END/i;
 const NOTE_EDITOR_OUT_RE = /^\s*You are back in the game|^\s*Note cancelled/i;
 const NOTE_POSTED_RE = /note (?:has been |was )?(?:posted|sent)|posted (?:to|on)|your note (?:has|is)|added to the/i;
@@ -242,10 +250,65 @@ export class Game {
     }
     this.sendRaw({ t: 'cmd', d: cmd });
     if (this.state.loggedIn && INV_VERBS.test(cmd.trim())) this.refreshInventory(800);
+    const dir = DIR_FULL[cmd.trim().toLowerCase()];
+    if (dir && !this.walker) this.lastMove = { dir, at: Date.now(), opened: false };
+    else if (!dir && !/^open\b/i.test(cmd.trim())) this.lastMove = null;
   }
 
   /** Several commands, e.g. a speedwalk. */
   commands(cmds: string[]) { for (const c of cmds) this.command(c); }
+
+  /**
+   * Walk a route one step at a time, each after the game shows we've arrived, so a closed door
+   * can be opened on the way (sending the whole route at once would run the rest from the wrong room).
+   */
+  walk(dirs: string[]) {
+    const steps = dirs.map((d) => DIR_FULL[d.toLowerCase()] ?? d.toLowerCase()).filter(Boolean);
+    if (!steps.length) return;
+    this.stopWalk();
+    this.lastMove = null;
+    this.walker = { steps, i: 0, from: this.state.room?.num, opened: false, timer: undefined };
+    this.walkStep();
+  }
+  stopWalk() { if (this.walker) clearTimeout(this.walker.timer); this.walker = null; }
+
+  private walker: { steps: string[]; i: number; from?: number; opened: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
+  /** The last single step typed or clicked, for opening a door it bumps into. */
+  private lastMove: { dir: string; at: number; opened: boolean } | null = null;
+
+  private walkStep() {
+    const w = this.walker;
+    if (!w) return;
+    if (w.i >= w.steps.length) return this.stopWalk();
+    w.from = this.state.room?.num;
+    w.opened = false;
+    this.command(w.steps[w.i]);
+    this.walkTimeout();
+  }
+  private walkTimeout() {
+    const w = this.walker;
+    if (!w) return;
+    clearTimeout(w.timer);
+    w.timer = setTimeout(() => { if (this.walker === w) this.stopWalk(); }, 5000); // no arrival: stop rather than guess
+  }
+
+  /** A door was in the way: open it and try the same step once more. */
+  private onDoorClosed() {
+    const w = this.walker;
+    if (w) {
+      if (w.opened) return this.stopWalk();
+      w.opened = true;
+      this.command(`open ${w.steps[w.i]}`);
+      this.command(w.steps[w.i]);
+      this.walkTimeout();
+      return;
+    }
+    const m = this.lastMove;
+    if (!m || m.opened || Date.now() - m.at > 4000) return;
+    m.opened = true;
+    this.command(`open ${m.dir}`);
+    this.command(m.dir);
+  }
 
   /** Send a command whose next prompt should not be shown. */
   private hidden(cmd: string) {
@@ -271,6 +334,7 @@ export class Game {
    */
   private gameDown = false; // the relay told us the game connection closed (and no new one yet)
   private dropBackgroundWork() {
+    this.stopWalk();
     if (this.writer) {
       clearTimeout(this.writer.timer);
       this.writer = null;
@@ -737,6 +801,8 @@ export class Game {
     }
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
+    if (DOOR_CLOSED_RE.test(text)) this.onDoorClosed();
+    else if (this.walker && WALK_BLOCKED_RE.test(text)) this.stopWalk();
     this.noteTime(text);
     if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
     if (this.mirror) this.mirror.lines.push(text);
@@ -822,6 +888,7 @@ export class Game {
         terrain: String(data.terrain ?? ''), details: String(data.details ?? ''),
         exits: mapNums(data.exits ?? {}), coord: data.coord,
       };
+      if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
       if (room.num !== this.state.room?.num) {
         this.refreshMap();
         if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });

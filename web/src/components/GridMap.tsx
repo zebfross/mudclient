@@ -30,7 +30,7 @@ export function GridMap() {
   const walk = (c: GridCell) => {
     if (c.x === 0 && c.y === 0) return;
     const path = gridPath(grid, c.x, c.y);
-    if (path?.length) game.commands(path.map((d) => DIR_NAMES[d] ?? d));
+    if (path?.length) game.walk(path);
   };
 
   return (
