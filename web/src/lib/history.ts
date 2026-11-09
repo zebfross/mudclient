@@ -8,3 +8,13 @@ export function searchHistory(history: string[], query: string, limit = 50): str
   }
   return out;
 }
+
+export const HISTORY_MAX = 1000;
+
+/**
+ * Add a command to the front of the history. An earlier copy moves up instead of being kept twice,
+ * so repeated commands (scan, scan, scan…) don't push older ones out.
+ */
+export function addHistory(history: string[], cmd: string, max = HISTORY_MAX): string[] {
+  return [cmd, ...history.filter((h) => h !== cmd)].slice(0, max);
+}

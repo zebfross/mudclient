@@ -2,12 +2,15 @@ import { useEffect, useRef, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
 import { Icon, NOT_A_LOGIN } from './ui.tsx';
 import { QuickBar } from './QuickBar.tsx';
-import { searchHistory } from '../lib/history.ts';
+import { addHistory, searchHistory } from '../lib/history.ts';
 
 const HISTORY_KEY = 'gaslamp.history.v1';
 
 function loadHistory(): string[] {
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]'); } catch { return []; }
+  try {
+    const h = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? '[]');
+    return Array.isArray(h) ? [...new Set(h.filter((x): x is string => typeof x === 'string'))] : [];
+  } catch { return []; }
 }
 
 function Highlight({ text, query }: { text: string; query: string }) {
@@ -66,8 +69,9 @@ export function CommandBar() {
 
   const run = (cmd: string) => {
     game.command(cmd);
-    if (localEcho && cmd.trim() && history.current[0] !== cmd) {
-      history.current = [cmd, ...history.current].slice(0, 200);
+    if (localEcho && cmd.trim()) {
+      // Re-read first: another tab may have added commands since this one loaded.
+      history.current = addHistory(loadHistory(), cmd);
       try { localStorage.setItem(HISTORY_KEY, JSON.stringify(history.current)); } catch { /* ignore */ }
     }
     pos.current = -1;
