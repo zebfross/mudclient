@@ -79,7 +79,7 @@ function verdictTitle(c: Comparison, level: number) {
 }
 
 export function Satchel({ bare = false }: { bare?: boolean }) {
-  const { inventory, inventoryAt, equipment, loggedIn, itemDetails, shop, room } = useGame();
+  const { inventory, inventoryAt, equipment, loggedIn, itemDetails, shop, room, shopAsking } = useGame();
   const compare = useComparisons();
   const here = shop && shop.room === room?.num ? shop : null;
   const [sellable, setSellable] = useState(false);
@@ -113,15 +113,23 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
         ))}
       </div>
       {here && (
-        <div className="rounded border border-secondary/40 bg-secondary/10 px-2.5 py-1.5 flex items-center gap-2 text-xs text-secondary">
+        <div className="rounded border border-secondary/40 bg-secondary/10 px-2.5 py-1.5 flex items-center gap-2 flex-wrap text-xs text-secondary">
           <Icon name="storefront" className="text-base" />
-          <span className="flex-1 min-w-0">
-            {asked < carried.length
-              ? `Asking ${here.keeper || 'the shopkeeper'} about your items… (${asked}/${carried.length})`
-              : buys.length
-                ? `${here.keeper || 'The shopkeeper'} would buy ${buys.length} of your items, about ${total.toLocaleString()} gold in all.`
-                : `${here.keeper || 'The shopkeeper'} isn’t interested in anything you carry.`}
+          <span className="flex-1 min-w-[10rem]">
+            {shopAsking
+              ? `Asking ${here.keeper || 'the shopkeeper'}… (${asked}/${carried.length})`
+              : asked === 0
+                ? 'You’re in a shop.'
+                : buys.length
+                  ? `${here.keeper || 'The shopkeeper'} would buy ${buys.length} of your items, about ${total.toLocaleString()} gold in all.`
+                  : `${here.keeper || 'The shopkeeper'} isn’t interested in anything you've asked about.`}
           </span>
+          {!shopAsking && asked < carried.length && (
+            <button type="button" className="btn" onClick={() => game.checkShop()} disabled={!loggedIn}
+              title="Asks the shopkeeper about each item ('value'); nothing is sold">
+              {asked === 0 ? `What would they buy? (${carried.length} items)` : `Ask about ${carried.length - asked} more`}
+            </button>
+          )}
           {buys.length > 0 && (
             <label className="flex items-center gap-1 cursor-pointer select-none whitespace-nowrap">
               <input type="checkbox" checked={sellable} onChange={(e) => setSellable(e.target.checked)} className="accent-[#ffb77d]" /> Only these
@@ -171,7 +179,9 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
 function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: boolean; onClose: () => void }) {
   const [label, icon, verb] = TYPE_INFO[item.type] ?? ['Item', 'category'];
   const { itemDetails, equipment, shop, room } = useGame();
-  const offer = !worn && shop && shop.room === room?.num ? shop.offers[item.id] : undefined;
+  const inShop = !worn && !!shop && shop.room === room?.num;
+  const offer = inShop ? shop!.offers[item.id] : undefined;
+  useEffect(() => { if (inShop && !(item.id in shop!.offers)) game.checkShop([item.id]); }, [item.id, inShop]);
   const details = itemDetails[item.id];
   const cmp = useComparisons()(item.id);
   const against = cmp?.against && equipment.find((e) => e.id === cmp.against!.id);
@@ -253,6 +263,8 @@ function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: bool
           {worn
             ? <button className="btn" onClick={() => act(`remove ${item.id}`)}>Remove</button>
             : <button className="btn btn-danger" onClick={() => act(`drop ${item.id}`)}>Drop</button>}
+          {inShop && offer === null && <span className="text-[11px] text-outline self-center">{shop!.keeper || 'The shopkeeper'} won’t buy this</span>}
+          {inShop && offer === undefined && <span className="text-[11px] text-outline self-center">Asking the shopkeeper…</span>}
           {typeof offer === 'number' && <button className="btn" onClick={() => act(`sell ${item.id}`)} title={`${shop?.keeper || 'The shopkeeper'} would pay about ${offer} gold`}><Icon name="sell" className="text-sm" /> Sell · {offer}g</button>}
           <button className="btn" onClick={() => { fillCommand(` ${item.id}`); onClose(); }}>Use in command…</button>
           {verb && !worn && <button className="btn btn-primary" onClick={() => act(`${verb} ${item.id}`)}>{verb}</button>}

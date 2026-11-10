@@ -47,6 +47,13 @@ export function parseValueReply(text: string): { keeper: string; gold: number | 
   if (/cannot be sold|can'?t be sold/i.test(text)) return { keeper: '', gold: null, why: 'can’t be sold to a shop' };
   return null;
 }
+const SHOPS_KEY = 'gaslamp.shops.v1';
+function loadShops(): Map<number, ShopOffers> {
+  try { return new Map((JSON.parse(localStorage.getItem(SHOPS_KEY) ?? '[]') as ShopOffers[]).map((e) => [e.room, e])); } catch { return new Map(); }
+}
+function saveShops(m: Map<number, ShopOffers>) {
+  try { localStorage.setItem(SHOPS_KEY, JSON.stringify([...m.values()].slice(-60))); } catch { /* ignore */ }
+}
 const NOTE_EDITOR_IN_RE = /^\s*You are now creating a new post|^\s*Enter your post\. Type END/i;
 const NOTE_EDITOR_OUT_RE = /^\s*You are back in the game|^\s*Note cancelled/i;
 const NOTE_POSTED_RE = /note (?:has been |was )?(?:posted|sent)|posted (?:to|on)|your note (?:has|is)|added to the/i;
@@ -134,6 +141,7 @@ export interface State {
   death: { at: number } | null;
   /** What the shopkeeper here would pay for your items: gold, or null for "not interested". */
   shop: ShopOffers | null;
+  shopAsking: boolean;
   /** In Aardwolf's note editor: whatever you type becomes part of the note. */
   noteEditor: boolean;
   lasertag: Lasertag;
@@ -174,7 +182,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, noteEditor: false, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, shopAsking: false, noteEditor: false, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -353,7 +361,7 @@ export class Game {
    */
   private gameDown = false; // the relay told us the game connection closed (and no new one yet)
   private dropBackgroundWork() {
-    this.shopPending.clear(); clearTimeout(this.shopTimer);
+    this.shopPending.clear(); clearTimeout(this.shopTimer); if (this.state.shopAsking) this.set({ shopAsking: false });
     this.stopWalk();
     if (this.writer) {
       clearTimeout(this.writer.timer);
@@ -675,33 +683,43 @@ export class Game {
   }
   clearCompose() { if (!this.writer) this.patchNotes({ compose: undefined }); }
 
-  private shopCache = new Map<number, ShopOffers>();
+  private shopCache = loadShops();
   private shopPending = new Set<string>();
   private shopTimer?: ReturnType<typeof setTimeout>;
+
+  private enterShop(num: number) {
+    const entry = this.shopCache.get(num) ?? { room: num, keeper: '', offers: {} };
+    this.set({ shop: { ...entry, offers: { ...entry.offers } } });
+  }
+
   /**
-   * In a shop, ask the shopkeeper what they'd pay for each carried item ('value <id>' never sells
-   * anything). Answers are kept per shop, so walking back in doesn't ask again.
+   * Ask the shopkeeper here what they'd pay ('value <id>' never sells anything): for the given
+   * items, or every carried item not asked about yet. Answers are remembered per shop.
    */
-  checkShop() {
+  checkShop(ids?: string[]) {
     const room = this.state.room;
     if (!this.state.loggedIn || !room || !/\bshop\b/i.test(room.details)) return;
     const entry = this.shopCache.get(room.num) ?? { room: room.num, keeper: '', offers: {} };
     this.shopCache.set(room.num, entry);
-    this.set({ shop: { ...entry, offers: { ...entry.offers } } });
     if (!this.capture && !this.captureQueue.length) this.shopPending.clear(); // unanswered asks may be retried
-    for (const it of this.state.inventory) {
-      if (it.wearLoc !== -1 || it.id in entry.offers || this.shopPending.has(`${room.num}:${it.id}`)) continue;
-      const key = `${room.num}:${it.id}`;
+    const want = ids ?? this.state.inventory.filter((it) => it.wearLoc === -1 && !(it.id in entry.offers)).map((it) => it.id);
+    for (const id of want) {
+      const key = `${room.num}:${id}`;
+      if (this.shopPending.has(key)) continue;
       this.shopPending.add(key);
-      this.captureReply(`value ${it.id}`, VALUE_REPLY_RE, (lines) => {
+      this.captureReply(`value ${id}`, VALUE_REPLY_RE, (lines) => {
         this.shopPending.delete(key);
         const v = parseValueReply(lines.join(' '));
         if (!v) return;
-        entry.offers[it.id] = v.gold;
+        entry.offers[id] = v.gold;
         if (v.keeper) entry.keeper = v.keeper;
-        if (this.state.room?.num === room.num) this.set({ shop: { ...entry, offers: { ...entry.offers } } });
+        saveShops(this.shopCache);
+        if (this.state.room?.num === room.num) this.set({ shop: { ...entry, offers: { ...entry.offers } }, shopAsking: this.shopPending.size > 0 });
       });
     }
+    this.set({ shop: { ...entry, offers: { ...entry.offers } }, shopAsking: this.shopPending.size > 0 });
+    clearTimeout(this.shopTimer);
+    this.shopTimer = setTimeout(() => { if (this.state.shopAsking) this.set({ shopAsking: false }); }, 30000); // some may never be answered
   }
 
   private detailsPending = new Set<string>();
@@ -914,7 +932,7 @@ export class Game {
     else if (tag === 'roomchars') this.set({ roomChars: nonEmpty });
     else if (tag === 'roomobjs') this.set({ roomObjs: nonEmpty });
     else if (tag === 'eqdata') { this.set({ equipment: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x) }); this.fetchItemDetails(); }
-    else if (tag === 'invdata') { this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() }); this.fetchItemDetails(); this.checkShop(); }
+    else if (tag === 'invdata') { this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() }); this.fetchItemDetails(); }
   }
 
   private onGmcp(pkg: string, data: any) {
@@ -941,7 +959,7 @@ export class Game {
       if (room.num !== this.state.room?.num) {
         this.refreshMap();
         clearTimeout(this.shopTimer);
-        if (/\bshop\b/i.test(room.details)) this.shopTimer = setTimeout(() => this.checkShop(), 700);
+        if (/\bshop\b/i.test(room.details)) this.enterShop(room.num); // remembered answers only; asking is on request
         else if (this.state.shop) this.set({ shop: null });
         if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });
       }

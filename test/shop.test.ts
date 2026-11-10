@@ -24,7 +24,11 @@ sent.length = 0;
 
 g.onMessage({ t: 'gmcp', pkg: 'room.info', data: { num: 50, name: 'Leather Shoppe', zone: 'z', details: 'shop', exits: {} } });
 await tick(800);
-assert.deepEqual(sent, ['value 111'], 'asks about carried items one at a time; not the worn cap');
+assert.deepEqual(sent, [], 'entering a shop asks nothing by itself');
+assert.deepEqual(g.state.shop?.offers, {});
+g.checkShop();
+await tick();
+assert.deepEqual(sent, ['value 111'], 'on request: carried items one at a time; not the worn cap');
 g.onMessage({ t: 'text', d: "Stitch tells you 'I would pay around 15 gold coins for a long sword.'\r\n\r\n> " });
 await tick(250);
 assert.deepEqual(sent, ['value 111', 'value 222']);
