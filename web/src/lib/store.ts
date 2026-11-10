@@ -32,6 +32,21 @@ const DIR_FULL: Record<string, string> = {
 const DOOR_CLOSED_RE = /^\s*The [\w' -]+ is closed\.\s*$/i;
 // Reasons a walk can't go on: stop, rather than send the rest of the route from the wrong room.
 const WALK_BLOCKED_RE = /^\s*(?:it'?s locked|the [\w' -]+ is locked|alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i;
+// "Stitch tells you 'I would pay around 15 gold coins for a long sword.'" / "Stitch is not interested in a pink flamingo."
+// Narrow on purpose: a player's tell arriving meanwhile must not be taken (and hidden) as the answer.
+const VALUE_REPLY_RE = /tells you '(?:I would pay|Alas, I cannot afford)|is not interested in|is far too valuable to sell|cannot be sold|can'?t be sold|you don'?t (?:have|seem to have)|you do not have|there is no shopkeeper|no shopkeeper here|won'?t buy|doesn'?t buy/i;
+/** A shopkeeper's answer to 'value': the gold offered, or null when they won't (or can't) buy it. */
+export function parseValueReply(text: string): { keeper: string; gold: number | null; why?: string } | null {
+  const pay = /^\s*(.+?) tells you '.*?\bpay\b\D*([\d,]+) gold/i.exec(text);
+  if (pay) return { keeper: pay[1].trim(), gold: Number(pay[2].replace(/,/g, '')) };
+  const afford = /^\s*(.+?) tells you '.*cannot afford/i.exec(text);
+  if (afford) return { keeper: afford[1].trim(), gold: null, why: 'can’t afford it' };
+  const no = /^\s*(.+?) (?:is not interested in|won'?t buy|doesn'?t buy)/i.exec(text);
+  if (no) return { keeper: no[1].trim(), gold: null };
+  if (/too valuable to sell/i.test(text)) return { keeper: '', gold: null, why: 'too valuable to sell' };
+  if (/cannot be sold|can'?t be sold/i.test(text)) return { keeper: '', gold: null, why: 'can’t be sold to a shop' };
+  return null;
+}
 const NOTE_EDITOR_IN_RE = /^\s*You are now creating a new post|^\s*Enter your post\. Type END/i;
 const NOTE_EDITOR_OUT_RE = /^\s*You are back in the game|^\s*Note cancelled/i;
 const NOTE_POSTED_RE = /note (?:has been |was )?(?:posted|sent)|posted (?:to|on)|your note (?:has|is)|added to the/i;
@@ -72,6 +87,8 @@ import { emptyLasertag, parseCharges, parseRoster, parseScan, type Lasertag, typ
 import { applyQuestEvent, emptyObjectives, isActiveGoal, parseCampaign, parseGoalDetail, parseGoalList, type Objectives } from './objectives.ts';
 
 export interface Line { id: number; segs: Seg[]; kind?: 'echo' | 'sys' | 'prompt' }
+export interface ShopOffers { room: number; keeper: string; offers: Record<string, number | null> }
+
 export interface InvItem {
   id: string; flags: string; name: Seg[]; plainName: string;
   level: number; type: number; unique: boolean; wearLoc: number; timer: number;
@@ -115,6 +132,8 @@ export interface State {
   asciiMap: Seg[][];
   /** Set when you die; cleared when you loot your corpse or dismiss the banner. */
   death: { at: number } | null;
+  /** What the shopkeeper here would pay for your items: gold, or null for "not interested". */
+  shop: ShopOffers | null;
   /** In Aardwolf's note editor: whatever you type becomes part of the note. */
   noteEditor: boolean;
   lasertag: Lasertag;
@@ -155,7 +174,7 @@ export class Game {
   state: State = {
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, noteEditor: false, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, noteEditor: false, lasertag: emptyLasertag(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -334,6 +353,7 @@ export class Game {
    */
   private gameDown = false; // the relay told us the game connection closed (and no new one yet)
   private dropBackgroundWork() {
+    this.shopPending.clear(); clearTimeout(this.shopTimer);
     this.stopWalk();
     if (this.writer) {
       clearTimeout(this.writer.timer);
@@ -655,6 +675,35 @@ export class Game {
   }
   clearCompose() { if (!this.writer) this.patchNotes({ compose: undefined }); }
 
+  private shopCache = new Map<number, ShopOffers>();
+  private shopPending = new Set<string>();
+  private shopTimer?: ReturnType<typeof setTimeout>;
+  /**
+   * In a shop, ask the shopkeeper what they'd pay for each carried item ('value <id>' never sells
+   * anything). Answers are kept per shop, so walking back in doesn't ask again.
+   */
+  checkShop() {
+    const room = this.state.room;
+    if (!this.state.loggedIn || !room || !/\bshop\b/i.test(room.details)) return;
+    const entry = this.shopCache.get(room.num) ?? { room: room.num, keeper: '', offers: {} };
+    this.shopCache.set(room.num, entry);
+    this.set({ shop: { ...entry, offers: { ...entry.offers } } });
+    if (!this.capture && !this.captureQueue.length) this.shopPending.clear(); // unanswered asks may be retried
+    for (const it of this.state.inventory) {
+      if (it.wearLoc !== -1 || it.id in entry.offers || this.shopPending.has(`${room.num}:${it.id}`)) continue;
+      const key = `${room.num}:${it.id}`;
+      this.shopPending.add(key);
+      this.captureReply(`value ${it.id}`, VALUE_REPLY_RE, (lines) => {
+        this.shopPending.delete(key);
+        const v = parseValueReply(lines.join(' '));
+        if (!v) return;
+        entry.offers[it.id] = v.gold;
+        if (v.keeper) entry.keeper = v.keeper;
+        if (this.state.room?.num === room.num) this.set({ shop: { ...entry, offers: { ...entry.offers } } });
+      });
+    }
+  }
+
   private detailsPending = new Set<string>();
   /** Quietly look up stats for wearable items we haven't seen before (each id once; they're cached). */
   fetchItemDetails() {
@@ -865,7 +914,7 @@ export class Game {
     else if (tag === 'roomchars') this.set({ roomChars: nonEmpty });
     else if (tag === 'roomobjs') this.set({ roomObjs: nonEmpty });
     else if (tag === 'eqdata') { this.set({ equipment: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x) }); this.fetchItemDetails(); }
-    else if (tag === 'invdata') { this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() }); this.fetchItemDetails(); }
+    else if (tag === 'invdata') { this.set({ inventory: nonEmpty.map((l) => parseInv(plain(l))).filter((x): x is InvItem => !!x), inventoryAt: Date.now() }); this.fetchItemDetails(); this.checkShop(); }
   }
 
   private onGmcp(pkg: string, data: any) {
@@ -891,6 +940,9 @@ export class Game {
       if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
       if (room.num !== this.state.room?.num) {
         this.refreshMap();
+        clearTimeout(this.shopTimer);
+        if (/\bshop\b/i.test(room.details)) this.shopTimer = setTimeout(() => this.checkShop(), 700);
+        else if (this.state.shop) this.set({ shop: null });
         if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });
       }
       this.mapper.add(room);

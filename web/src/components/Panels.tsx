@@ -79,8 +79,10 @@ function verdictTitle(c: Comparison, level: number) {
 }
 
 export function Satchel({ bare = false }: { bare?: boolean }) {
-  const { inventory, inventoryAt, equipment, loggedIn, itemDetails } = useGame();
+  const { inventory, inventoryAt, equipment, loggedIn, itemDetails, shop, room } = useGame();
   const compare = useComparisons();
+  const here = shop && shop.room === room?.num ? shop : null;
+  const [sellable, setSellable] = useState(false);
   const [open, setOpen] = useState<{ item: InvItem; worn: boolean } | null>(null);
   const [cat, setCat] = useState<Category>(() => { try { return (localStorage.getItem(CAT_KEY) as Category) || 'all'; } catch { return 'all'; } });
   const choose = (c: Category) => { setCat(c); try { localStorage.setItem(CAT_KEY, c); } catch { /* ignore */ } };
@@ -89,7 +91,11 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
   const count = (c: Category) => (c === 'all' ? carried.length : c === 'equipped' ? equipment.length : carried.filter((i) => categoryOf(i.type) === c).length);
   const tabs = CATEGORIES.filter((c) => c.id === 'all' || c.id === 'equipped' || count(c.id) > 0);
   const active = tabs.some((t) => t.id === cat) ? cat : 'all';
-  const items = active === 'equipped' ? equipment : active === 'all' ? carried : carried.filter((i) => categoryOf(i.type) === active);
+  const shown = active === 'equipped' ? equipment : active === 'all' ? carried : carried.filter((i) => categoryOf(i.type) === active);
+  const items = here && sellable && active !== 'equipped' ? shown.filter((i) => typeof here.offers[i.id] === 'number') : shown;
+  const buys = here ? carried.filter((i) => typeof here.offers[i.id] === 'number') : [];
+  const asked = here ? carried.filter((i) => i.id in here.offers).length : 0;
+  const total = buys.reduce((n, i) => n + (here!.offers[i.id] ?? 0), 0);
   const label = CATEGORIES.find((c) => c.id === active)!.label;
 
   return (
@@ -106,6 +112,23 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
           </button>
         ))}
       </div>
+      {here && (
+        <div className="rounded border border-secondary/40 bg-secondary/10 px-2.5 py-1.5 flex items-center gap-2 text-xs text-secondary">
+          <Icon name="storefront" className="text-base" />
+          <span className="flex-1 min-w-0">
+            {asked < carried.length
+              ? `Asking ${here.keeper || 'the shopkeeper'} about your items… (${asked}/${carried.length})`
+              : buys.length
+                ? `${here.keeper || 'The shopkeeper'} would buy ${buys.length} of your items, about ${total.toLocaleString()} gold in all.`
+                : `${here.keeper || 'The shopkeeper'} isn’t interested in anything you carry.`}
+          </span>
+          {buys.length > 0 && (
+            <label className="flex items-center gap-1 cursor-pointer select-none whitespace-nowrap">
+              <input type="checkbox" checked={sellable} onChange={(e) => setSellable(e.target.checked)} className="accent-[#ffb77d]" /> Only these
+            </label>
+          )}
+        </div>
+      )}
       {items.length === 0 ? (
         <Empty>{!loggedIn ? 'Log in to see your inventory.' : !inventoryAt ? 'Reading your inventory…' : active === 'equipped' ? 'You aren’t wearing anything.' : active === 'all' ? 'You carry nothing.' : `No ${label.toLowerCase()}.`}</Empty>
       ) : (
@@ -115,12 +138,17 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
             const worn = active === 'equipped';
             const cmp = worn ? null : compare(it.id);
             const score = itemDetails[it.id]?.score;
+            const offer = here && !worn ? here.offers[it.id] : undefined;
+            const offerTitle = offer === undefined ? '' : offer === null ? ` — ${here!.keeper || 'the shopkeeper'} won’t buy this` : ` — sells here for about ${offer} gold`;
             return (
-              <button key={it.id} onClick={() => setOpen({ item: it, worn })} title={`${it.plainName}${cmp ? ` — ${verdictTitle(cmp, it.level)}` : ''}`}
-                className="relative aspect-square bg-surface-lowest/50 rounded p-1.5 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-lowest/80 border border-surface-high/30 group">
+              <button key={it.id} onClick={() => setOpen({ item: it, worn })} title={`${it.plainName}${cmp ? ` — ${verdictTitle(cmp, it.level)}` : ''}${offerTitle}`}
+                className={`${offer === null ? 'opacity-45 ' : ''}relative aspect-square bg-surface-lowest/50 rounded p-1.5 flex flex-col items-center justify-center text-center shadow-inner hover:bg-surface-lowest/80 border border-surface-high/30 group`}>
                 <Icon name={icon} className="text-primary text-xl group-hover:scale-110 transition-transform" />
                 <span className="text-[10px] text-on-surface-variant mt-1 leading-tight line-clamp-2"><SegText segs={it.name} /></span>
                 <span className="font-mono text-[8px] text-outline uppercase mt-0.5">{typeLabel} · L{it.level}{worn && score !== undefined ? ` · ★${score}` : ''}</span>
+                {typeof offer === 'number' && (
+                  <span className="absolute top-1 left-1 rounded border border-secondary/50 bg-secondary/15 text-secondary px-1 font-mono text-[9px] font-bold leading-tight">{offer}g</span>
+                )}
                 {cmp && (
                   <span className={`absolute top-1 right-1 rounded border px-1 font-mono text-[9px] font-bold leading-tight ${VERDICT_STYLE[cmp.verdict]}`}>
                     {verdictText(cmp, it.level)}
@@ -142,7 +170,8 @@ export function Satchel({ bare = false }: { bare?: boolean }) {
 
 function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: boolean; onClose: () => void }) {
   const [label, icon, verb] = TYPE_INFO[item.type] ?? ['Item', 'category'];
-  const { itemDetails, equipment } = useGame();
+  const { itemDetails, equipment, shop, room } = useGame();
+  const offer = !worn && shop && shop.room === room?.num ? shop.offers[item.id] : undefined;
   const details = itemDetails[item.id];
   const cmp = useComparisons()(item.id);
   const against = cmp?.against && equipment.find((e) => e.id === cmp.against!.id);
@@ -224,6 +253,7 @@ function ItemModal({ item, worn = false, onClose }: { item: InvItem; worn?: bool
           {worn
             ? <button className="btn" onClick={() => act(`remove ${item.id}`)}>Remove</button>
             : <button className="btn btn-danger" onClick={() => act(`drop ${item.id}`)}>Drop</button>}
+          {typeof offer === 'number' && <button className="btn" onClick={() => act(`sell ${item.id}`)} title={`${shop?.keeper || 'The shopkeeper'} would pay about ${offer} gold`}><Icon name="sell" className="text-sm" /> Sell · {offer}g</button>}
           <button className="btn" onClick={() => { fillCommand(` ${item.id}`); onClose(); }}>Use in command…</button>
           {verb && !worn && <button className="btn btn-primary" onClick={() => act(`${verb} ${item.id}`)}>{verb}</button>}
         </div>
