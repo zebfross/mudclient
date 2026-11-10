@@ -332,9 +332,10 @@ export class Game {
     }
     const m = this.lastMove;
     if (!m || m.opened || Date.now() - m.at > 4000) return;
-    m.opened = true;
     this.command(`open ${m.dir}`);
     this.command(m.dir);
+    // The retry is itself a move: mark it tried, or the next "is closed" would start this again.
+    this.lastMove = { dir: m.dir, at: Date.now(), opened: true };
   }
 
   /** Send a command whose next prompt should not be shown. */
@@ -869,6 +870,7 @@ export class Game {
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
     if (DOOR_CLOSED_RE.test(text)) this.onDoorClosed();
+    else if (this.lastMove && /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i.test(text)) this.lastMove.opened = true; // no key: don't retry
     else if (this.walker && WALK_BLOCKED_RE.test(text)) this.stopWalk();
     this.noteTime(text);
     if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }

@@ -56,5 +56,16 @@ function setup() {
   assert.equal(sent.length, 4, 'looking at a door does not open it');
 }
 
+// A locked door with no key: one try, then nothing more, even as the game keeps answering.
+{
+  const { g, sent, say } = setup();
+  g.command('west');
+  for (let i = 0; i < 4; i++) {
+    say('The door is closed.\r\n[100hp] > '); await tick(250);
+    say("It's locked.\r\n[100hp] > "); await tick(250);
+  }
+  assert.deepEqual(sent, ['west', 'open west', 'west']);
+}
+
 console.log('walk tests passed');
 process.exit(0);
