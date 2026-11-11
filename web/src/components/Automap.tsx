@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { game, useGame } from '../lib/store.ts';
+import { adapterFor } from '../lib/games/index.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { CardHead, Empty, Icon, SegText, terrainIcon } from './ui.tsx';
 import { GridMap } from './GridMap.tsx';
@@ -77,7 +78,7 @@ export function Automap() {
 
 function MapFrame({ mode }: { mode: Mode }) {
   const { room, mapVersion, asciiMap, loggedIn, mud } = useGame();
-  const ire = mud.family === 'ire';
+  const { diagonals: ire, coords } = adapterFor(mud.family).features;
   const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
   const map = game.mapper;
   const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion]);
@@ -153,7 +154,7 @@ function MapFrame({ mode }: { mode: Mode }) {
           )}
         </div>
         <DirButton dir="e" />
-        {ire ? <DirButton dir="sw" /> : <Coords />}
+        {ire ? <DirButton dir="sw" /> : coords ? <Coords /> : <span />}
         {ire ? <span className="flex gap-1"><DirButton dir="s" /><DirButton dir="d" /></span> : <DirButton dir="s" />}
         {ire ? <DirButton dir="se" /> : <DirButton dir="d" />}
       </div>

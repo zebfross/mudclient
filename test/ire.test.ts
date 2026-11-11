@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { Game } from '../web/src/lib/store.ts';
 import { plain } from '../web/src/lib/ansi.ts';
+import { adapterFor } from '../web/src/lib/games/index.ts';
 import { gridPath, key, parseAsciiMap } from '../web/src/lib/asciiMap.ts';
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
@@ -20,6 +21,18 @@ function setup() {
   const { g } = setup();
   assert.deepEqual(g.state.mud, { game: 'achaea', family: 'ire' });
   assert.equal(g.gameName, 'Achaea');
+  assert.equal(g.adapter.family, 'ire');
+  assert.equal(new Game().adapter.family, 'aardwolf');
+}
+
+// Each game says what it supports; the UI hides the rest.
+{
+  const a = adapterFor('aardwolf').features, i = adapterFor('ire').features;
+  assert.ok(a.notes && a.hungerThirst && a.objectives && !a.diagonals);
+  assert.ok(!i.notes && !i.hungerThirst && !i.objectives && i.diagonals);
+  assert.equal(i.movesLabel, 'EP');
+  assert.ok(!adapterFor('ire').quickCommands.includes('campaign check'));
+  assert.equal(adapterFor('nonsense').family, 'aardwolf', 'unknown games fall back to Aardwolf');
 }
 
 // Achaea's login screen counts as the name prompt.

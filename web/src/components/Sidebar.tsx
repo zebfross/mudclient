@@ -9,6 +9,10 @@ import { Notes, usePersonalUnread } from './Notes.tsx';
 import { LasertagPanel, useInArena } from './Lasertag.tsx';
 import { questActive } from '../lib/objectives.ts';
 import { Icon } from './ui.tsx';
+import { adapterFor, type Features } from '../lib/games/index.ts';
+
+// Tabs that only make sense in games with the matching feature.
+const TAB_FEATURE: Partial<Record<TabId, keyof Features>> = { goals: 'objectives', notes: 'notes', laser: 'lasertag' };
 
 type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat' | 'notes' | 'laser';
 const TABS: { id: TabId; icon: string; label: string }[] = [
@@ -32,10 +36,13 @@ function loadTab(): TabId {
 
 /** Map pinned on top, icon-tabbed panels below. */
 export function Sidebar({ className = '' }: { className?: string }) {
-  const { chat, roomObjs, roomChars, inventory, objectives, lasertag } = useGame();
+  const { chat, roomObjs, roomChars, inventory, objectives, lasertag, mud } = useGame();
+  const features = adapterFor(mud.family).features;
+  const tabs = TABS.filter((t) => !TAB_FEATURE[t.id] || features[TAB_FEATURE[t.id]!]);
   const inArena = useInArena();
   const notesUnread = usePersonalUnread();
-  const [tab, setTab] = useState<TabId>(loadTab);
+  const [chosen, setTab] = useState<TabId>(loadTab);
+  const tab = tabs.some((t) => t.id === chosen) ? chosen : 'objects';
   const [seenChat, setSeenChat] = useState(chat.length);
 
   useEffect(() => { if (tab === 'chat') setSeenChat(chat.length); }, [tab, chat.length]);
@@ -73,7 +80,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
       <Automap />
       <section className="card flex flex-col flex-1 min-h-[22rem] overflow-hidden">
         <div role="tablist" aria-label="Sidebar panels" className="flex border-b border-surface-high/40 bg-surface-lowest/60">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const active = tab === t.id;
             const n = counts[t.id];
             return (

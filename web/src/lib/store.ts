@@ -2,6 +2,10 @@
 import { useSyncExternalStore } from 'react';
 import { AnsiParser, plain, type Seg } from './ansi.ts';
 import { aardSegs, stripAard } from './aardColor.ts';
+import { adapterFor, type GameAdapter, type Host } from './games/index.ts';
+import type { CaptureCb } from './games/types.ts';
+import { mapNums, num, trimBlankLines } from './games/util.ts';
+export { extractMap } from './games/util.ts';
 import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
 import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
@@ -30,16 +34,6 @@ const DIR_FULL: Record<string, string> = {
   north: 'north', south: 'south', east: 'east', west: 'west', up: 'up', down: 'down',
   northeast: 'northeast', northwest: 'northwest', southeast: 'southeast', southwest: 'southwest',
 };
-const DIR_SHORT: Record<string, string> = {
-  north: 'n', south: 's', east: 'e', west: 'w', up: 'u', down: 'd',
-  northeast: 'ne', northwest: 'nw', southeast: 'se', southwest: 'sw', in: 'in', out: 'out',
-};
-// Aardwolf: "The door is closed." / "The iron gate is closed." Iron Realms: "There is a door in the way."
-const DOOR_CLOSED_RE = /^\s*(?:The [\w' -]+ is closed\.|There is a (?:closed )?[\w' -]+ in the way\.?)\s*$/i;
-// "It's locked." / "The door is locked." (stop, unless we can try the key once)
-const DOOR_LOCKED_RE = /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i;
-// Reasons a walk can't go on: stop, rather than send the rest of the route from the wrong room.
-const WALK_BLOCKED_RE = /^\s*(?:alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i;
 // "Stitch tells you 'I would pay around 15 gold coins for a long sword.'" / "Stitch is not interested in a pink flamingo."
 // Narrow on purpose: a player's tell arriving meanwhile must not be taken (and hidden) as the answer.
 const VALUE_REPLY_RE = /tells you '(?:I would pay|Alas, I cannot afford)|is not interested in|is far too valuable to sell|cannot be sold|can'?t be sold|you don'?t (?:have|seem to have)|you do not have|there is no shopkeeper|no shopkeeper here|won'?t buy|doesn'?t buy/i;
@@ -90,11 +84,7 @@ export function noteLines(body: string, width = 76): string[] {
 const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: [], open: null, loading: false, at: 0 });
 // e.g. Aaeron says, "I have sent a personal note to you…" / "A new note has been posted…"
 export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string; retry?: boolean }
-// Aardwolf's wording isn't documented here, so these are deliberately broad.
-// The question itself, not the banner line above it ("Enter your character name or type 'NEW'…").
-const IRE_MAP_START = /^\s*--- Area \d+: .* ---\s*$/;
-const IRE_MAP_END = /^\s*--- .* -?\d+:-?\d+:-?\d+ ---\s*$/;
-const NAME_PROMPT_RE = /(?:what be thy name|what is your name|by what name)[^?]*\?\s*$|^\s*name\s*:\s*$|enter your character'?s name\.?\s*$/i;
+// The wording isn't documented, so these are deliberately broad. (The name prompt is per game.)
 const WRONG_PASSWORD_RE = /wrong password|incorrect password|password (?:is )?incorrect|invalid password/i;
 // Only checked after the name was sent: the login banner itself mentions creating a new character.
 const NEW_CHAR_RE = /did i get that right|is that (?:right|correct)\?|no such (?:player|character)/i;
@@ -170,7 +160,6 @@ const WANT_TAGS = ['roomnames', 'roomdescs', 'roomchars', 'roomobjs', 'exits', '
 const INV_VERBS = /^(get|take|drop|put|give|buy|sell|wear|wield|remove|rem|hold|quaff|eat|drink|recite|sac|sacrifice|junk|donate|brandish|zap|loot|keep|unkeep)\b/i;
 
 let nextId = 1;
-const num = (v: unknown) => (typeof v === 'number' ? v : Number(v) || 0);
 
 function takePrefix(segs: Seg[], n: number): Seg[] {
   const out: Seg[] = [];
@@ -193,7 +182,7 @@ function stripPrefix(segs: Seg[], n: number): Seg[] {
   return out;
 }
 
-export class Game {
+export class Game implements Host {
   state: State = {
     mud: { game: 'aardwolf', family: 'aardwolf' },
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
@@ -234,13 +223,16 @@ export class Game {
   subscribe = (fn: () => void) => { this.listeners.add(fn); return () => this.listeners.delete(fn); };
   getSnapshot = () => this.state;
 
-  private set(patch: Partial<State>) {
+  /** This game's conventions (Aardwolf, Iron Realms…), picked by what the relay connects to. */
+  get adapter(): GameAdapter { return adapterFor(this.state.mud.family); }
+
+  set(patch: Partial<State>) {
     this.state = { ...this.state, ...patch };
     for (const l of this.listeners) l();
   }
 
   // Lines arrive in bursts; batch them into one state update per animation frame.
-  private print(line: Omit<Line, 'id'>) {
+  print(line: Omit<Line, 'id'>) {
     this.pendingLines.push({ id: nextId++, ...line });
     if (this.flushQueued) return;
     this.flushQueued = true;
@@ -279,15 +271,10 @@ export class Game {
     // If you're in the game, the character data that comes back logs us in and we look around.
     // (At Aardwolf's login screen a 'look' would be taken as a character name.)
     this.lookAfterLogin = true;
-    // Iron Realms: asking for the inventory only gets an answer in the game, so the reply logs us in.
-    if (this.ire) { this.gmcp('Char.Items.Inv'); return; }
-    this.gmcp('request char');
-    this.gmcp('request room');
+    this.adapter.onResume(this);
   }
   /** The game's display name: "Aardwolf", "Achaea". */
   get gameName() { const g = this.state.mud.game; return g.charAt(0).toUpperCase() + g.slice(1); }
-  /** An Iron Realms game (Achaea…): none of Aardwolf's tags, background commands or GMCP shapes. */
-  get ire() { return this.state.mud.family === 'ire'; }
   private lookAfterLogin = false;
   disconnect() { this.set({ manualDisconnect: true }); this.cancelSignIn(); this.sendRaw({ t: 'disconnect' }); }
 
@@ -345,12 +332,6 @@ export class Game {
     w.timer = setTimeout(() => { if (this.walker === w) this.stopWalk(); }, 5000); // no arrival: stop rather than guess
   }
 
-  /** A door was in the way: open it and try the same step once more. */
-  /** "open north" on Aardwolf; "open door n" on Iron Realms games, which name the door. */
-  private doorCmd(verb: 'open' | 'unlock', dir: string) {
-    return this.ire ? `${verb} door ${DIR_SHORT[dir] ?? dir}` : `${verb} ${dir}`;
-  }
-
   /** A door in the way of a move: open it and try once more. */
   private onDoorClosed() { this.retryDoor(false); }
 
@@ -366,8 +347,8 @@ export class Game {
       else this.lastMove = null; // tried already: no loop
       return;
     }
-    if (locked) this.command(this.doorCmd('unlock', m.dir));
-    this.command(this.doorCmd('open', m.dir));
+    if (locked) this.command(this.adapter.doorCommand('unlock', m.dir));
+    this.command(this.adapter.doorCommand('open', m.dir));
     this.command(m.dir);
     // The retry is itself a move: mark what we tried, or the same reply would start this again.
     const tried = { opened: true, unlocked: m.unlocked || locked };
@@ -377,7 +358,8 @@ export class Game {
 
   /** Send a command whose next prompt should not be shown. */
   private hidden(cmd: string) {
-    if (this.gameDown || this.writer || this.ire) return; // in the note editor it would become a line of the note
+    // In the note editor it would become a line of the note; some games only allow a few quietly.
+    if (this.gameDown || this.writer || !this.adapter.allowsQuiet(cmd)) return;
     if (Date.now() > this.suppressPromptsUntil) this.suppressPrompts = 0;
     this.suppressPrompts++;
     this.suppressPromptsUntil = Date.now() + 3000;
@@ -415,8 +397,9 @@ export class Game {
     if (this.state.notes.loading) this.set({ notes: { ...this.state.notes, loading: false } });
   }
 
-  private captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
-    if (this.gameDown || (this.ire && cmd !== 'map')) return; // on IRE games, only the map so far // nothing to ask; it would be sent to whatever connects next
+  captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
+    // Game down: nothing to ask; it would be sent to whatever connects next.
+    if (this.gameDown || !this.adapter.allowsQuiet(cmd)) return;
     this.captureQueue.push({ cmd, start, end, cb });
     if (!this.capture) this.nextCapture();
   }
@@ -450,24 +433,14 @@ export class Game {
     try { localStorage.setItem(PROMPT_KEY, sample); } catch { /* ignore */ }
   }
 
-  /** Quietly redraw Aardwolf's own map for the sidebar (debounced, so a speedwalk draws once). */
+  /** Quietly redraw the game's own map for the sidebar (debounced, so a speedwalk draws once). */
   refreshMap(delay = 300) {
     clearTimeout(this.mapTimer);
-    if (this.ire) {
-      // Achaea: "--- Area N: Name - vNUM ---", the grid, then "--- Room name ---- x:y:z ---".
-      this.mapTimer = setTimeout(() => {
-        if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'map')) return;
-        this.captureReply('map', IRE_MAP_START, (_text, segs) => this.set({ asciiMap: trimBlankLines(segs) }), IRE_MAP_END);
-      }, delay);
-      return;
-    }
     this.mapTimer = setTimeout(() => {
-      if (!this.state.loggedIn || !this.mapTagOn || this.captureQueue.some((q) => q.cmd === 'map')) return;
-      this.captureReply('map', /^\s*<MAPSTART>/, (_text, segs) => {
-        const { map, rest } = extractMap(segs);
-        if (map.length) { this.set({ asciiMap: map }); this.noteMapMarks(); }
-        for (const l of rest) if (plain(l).trim()) this.print({ segs: l }); // anything that wasn't the map
-      });
+      if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'map')) return;
+      // Aardwolf: only with <MAPSTART>/<MAPEND> markers can a map reply be told apart.
+      if (this.adapter.family === 'aardwolf' && !this.mapTagOn) return;
+      this.adapter.fetchMap(this);
     }, delay);
   }
 
@@ -506,7 +479,7 @@ export class Game {
   signIn(name: string, password: string) {
     if (this.state.loggedIn || !name.trim() || !password) return;
     if (this.pendingLogin) clearTimeout(this.pendingLogin.timer);
-    this.pendingLogin = { name: name.trim(), password, timer: setTimeout(() => this.loginFailed('Aardwolf didn’t finish the login. Check the Chronicle for what it asked.'), 30000) };
+    this.pendingLogin = { name: name.trim(), password, timer: setTimeout(() => this.loginFailed(`${this.gameName} didn’t finish the login. Check the Chronicle for what it asked.`), 30000) };
     this.set({ login: { stage: 'waiting' } });
     if (!this.state.connected && !this.connecting) this.connect();
     else if (this.atNamePrompt) this.sendLoginName();
@@ -545,15 +518,15 @@ export class Game {
 
   /** Before login: spot the name prompt, the "press return" pause, and failures. */
   private watchLogin(text: string) {
-    if (NAME_PROMPT_RE.test(text)) {
+    if (this.adapter.namePrompt.test(text)) {
       this.atNamePrompt = true;
-      if (this.state.login.stage === 'name') this.loginFailed('Aardwolf asked for the name again. Check the spelling.');
+      if (this.state.login.stage === 'name') this.loginFailed(`${this.gameName} asked for the name again. Check the spelling.`);
       else this.sendLoginName();
       return;
     }
     if (!this.pendingLogin && this.state.login.stage !== 'password') return;
     if (WRONG_PASSWORD_RE.test(text)) this.loginFailed('Wrong password.');
-    else if (this.state.login.stage === 'name' && NEW_CHAR_RE.test(text)) this.loginFailed('Aardwolf doesn’t know that name: it’s offering to create a new character. Answer it in the command line, or check the name.');
+    else if (this.state.login.stage === 'name' && NEW_CHAR_RE.test(text)) this.loginFailed(`${this.gameName} doesn’t know that name: it’s offering to create a new character. Answer it in the command line, or check the name.`);
     else if (PRESS_RETURN_RE.test(text) && this.state.login.stage === 'password') this.sendRaw({ t: 'cmd', d: '' });
   }
 
@@ -572,7 +545,7 @@ export class Game {
   }
 
   /** One tick is one game hour. A new day re-reads the calendar (seasons roll over). */
-  private tick() {
+  tick() {
     const c = this.state.clock;
     if (c.hour === undefined) return;
     const hour = (c.hour + 1) % 24;
@@ -815,7 +788,7 @@ export class Game {
           this.atNamePrompt = false;
           this.dropBackgroundWork();
           // Couldn't reach the game, or it hung up mid-login: worth another try later.
-          if (this.pendingLogin && !attempt) this.loginFailed(msg.msg ? `Couldn’t reach Aardwolf (${msg.msg}).` : 'The connection closed during login.', true);
+          if (this.pendingLogin && !attempt) this.loginFailed(msg.msg ? `Couldn’t reach ${this.gameName} (${msg.msg}).` : 'The connection closed during login.', true);
         }
         break;
       }
@@ -842,7 +815,7 @@ export class Game {
     // Login questions end without a newline (and without GA on some servers): check them as they arrive.
     if (!this.state.loggedIn && this.cur.length) {
       const t = plain(this.cur);
-      if (NAME_PROMPT_RE.test(t) && t !== this.loginPartialSeen) { this.loginPartialSeen = t; this.watchLogin(t); }
+      if (this.adapter.namePrompt.test(t) && t !== this.loginPartialSeen) { this.loginPartialSeen = t; this.watchLogin(t); }
     }
     if (this.writer && this.cur.length) this.watchWriter(plain(this.cur));
     if (!this.sawGA && this.cur.length) {
@@ -914,11 +887,12 @@ export class Game {
     }
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
-    if (DOOR_CLOSED_RE.test(text)) this.onDoorClosed();
-    else if (DOOR_LOCKED_RE.test(text)) this.onDoorLocked();
-    else if (this.walker && WALK_BLOCKED_RE.test(text)) this.stopWalk();
-    this.noteTime(text);
-    if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
+    const a = this.adapter;
+    if (a.doorClosed.test(text)) this.onDoorClosed();
+    else if (a.doorLocked.test(text)) this.onDoorLocked();
+    else if (this.walker && a.walkBlocked.test(text)) this.stopWalk();
+    if (a.features.gameClock) this.noteTime(text);
+    if (a.features.notes && NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
     if (this.mirror) this.mirror.lines.push(text);
     const news = /^\s*Lasertag\s*:\s*(.+)$/.exec(text);
     if (news) this.lt({ news: { text: news[1].trim(), at: Date.now() } });
@@ -988,94 +962,30 @@ export class Game {
       try { data = JSON.parse(data.replace(/[\x00-\x1f]/g, (c) => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'))); } catch { /* keep string */ }
     }
     const p = pkg.toLowerCase();
-    const char = this.state.char;
-    if (this.ire) {
-      this.onIreGmcp(p, data ?? {});
-      if (!this.state.loggedIn && (p === 'char.vitals' || p === 'char.name' || p === 'char.status' || p.startsWith('char.items.'))) this.onLogin();
-      return;
-    }
-    if (p === 'comm.tick') return this.tick();
-    if (p === 'char.base') this.set({ char: { ...char, base: data } });
-    else if (p === 'char.vitals') this.set({ char: { ...char, vitals: { hp: num(data.hp), mana: num(data.mana), moves: num(data.moves) } } });
-    else if (p === 'char.maxstats') this.set({ char: { ...char, maxstats: mapNums(data) } });
-    else if (p === 'char.stats') this.set({ char: { ...char, stats: mapNums(data) } });
-    else if (p === 'char.status') this.set({ char: { ...char, status: data } });
-    else if (p === 'char.worth') this.set({ char: { ...char, worth: mapNums(data) } });
-    else if (p === 'room.info') {
-      const room: RoomInfo = {
-        num: num(data.num), name: stripAard(String(data.name ?? '')), zone: String(data.zone ?? ''),
-        terrain: String(data.terrain ?? ''), details: String(data.details ?? ''),
-        exits: mapNums(data.exits ?? {}), coord: data.coord,
-      };
-      if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
-      if (room.num !== this.state.room?.num) {
-        this.refreshMap();
-        clearTimeout(this.shopTimer);
-        if (/\bshop\b/i.test(room.details)) this.enterShop(room.num); // remembered answers only; asking is on request
-        else if (this.state.shop) this.set({ shop: null });
-        if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });
-      }
-      this.mapper.add(room);
-      this.set({ room, mapVersion: this.state.mapVersion + 1 });
-    } else if (p === 'comm.channel') {
-      const raw = String(data.msg ?? '');
-      const msg: ChatMsg = { id: nextId++, chan: String(data.chan), player: String(data.player ?? ''), msg: raw.includes('\x1b') ? new AnsiParser().parse(raw) : aardSegs(raw), at: Date.now() };
-      if (!plain(msg.msg).trim()) return;
-      const chat = this.state.chat.concat(msg).slice(-CHAT_MAX);
-      this.set({ chat });
-      saveChat(chat);
-    } else if (p === 'comm.quest') {
-      this.set({ objectives: { ...this.state.objectives, quest: applyQuestEvent(this.state.objectives.quest, data ?? {}) } });
-    } else if (p === 'group') {
-      this.set({ group: { groupname: data.groupname, leader: data.leader, members: data.members ?? [] } });
-    }
-
-    if (!this.state.loggedIn && p.startsWith('char.')) this.onLogin();
+    this.adapter.onGmcp(this, p, data ?? {});
+    if (!this.state.loggedIn && this.adapter.isLoginSignal(p)) this.onLogin();
   }
 
-  /**
-   * Iron Realms GMCP, mapped onto the same state Aardwolf fills:
-   * Char.Vitals {hp, maxhp, mp, maxmp, ep, maxep, wp, maxwp, nl}, Char.Name {name, fullname},
-   * Char.Status {level: "12 (34%)", class, race…}, Room.Info {num, name, area, environment, exits, details[]},
-   * Comm.Channel.Text {channel, talker, text}.
-   */
-  private onIreGmcp(p: string, data: any) {
-    const char = this.state.char;
-    if (p === 'char.vitals') {
-      this.set({ char: { ...char,
-        vitals: { hp: num(data.hp), mana: num(data.mp), moves: num(data.ep) },
-        maxstats: { ...char.maxstats, maxhp: num(data.maxhp), maxmana: num(data.maxmp), maxmoves: num(data.maxep) },
-        ire: { ...char.ire, vitals: data },
-      } });
-    } else if (p === 'char.name') {
-      this.set({ char: { ...char, base: { ...char.base, name: String(data.name ?? ''), fullname: String(data.fullname ?? '') } } });
-    } else if (p === 'char.status') {
-      // Status updates are partial: merge. Level arrives as "12 (34%)".
-      const ire = { ...char.ire, status: { ...char.ire?.status, ...data } };
-      const st = ire.status;
-      this.set({ char: { ...char, ire,
-        base: { ...char.base, name: st.name ?? char.base?.name, class: st.class, race: st.race, fullname: st.fullname ?? char.base?.fullname },
-        worth: st.gold !== undefined ? { ...char.worth, gold: num(st.gold), bank: num(st.bank) } : char.worth,
-      } });
-    } else if (p === 'room.info') {
-      const room: RoomInfo = {
-        num: num(data.num), name: String(data.name ?? ''), zone: String(data.area ?? ''),
-        terrain: String(data.environment ?? '').toLowerCase(),
-        details: Array.isArray(data.details) ? data.details.join(',') : String(data.details ?? ''),
-        exits: mapNums(data.exits ?? {}),
-      };
-      if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
-      if (room.num !== this.state.room?.num) this.refreshMap();
-      this.mapper.add(room);
-      this.set({ room, mapVersion: this.state.mapVersion + 1 });
-    } else if (p === 'comm.channel.text') {
-      const raw = String(data.text ?? '');
-      const msg: ChatMsg = { id: nextId++, chan: String(data.channel ?? ''), player: String(data.talker ?? ''), msg: new AnsiParser().parse(raw), at: Date.now() };
-      if (!plain(msg.msg).trim()) return;
-      const chat = this.state.chat.concat(msg).slice(-CHAT_MAX);
-      this.set({ chat });
-      saveChat(chat);
+  /** A room report from any game: walking, the map, and per-room features. */
+  enterRoom(room: RoomInfo) {
+    if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
+    if (room.num !== this.state.room?.num) {
+      this.refreshMap();
+      clearTimeout(this.shopTimer);
+      if (this.adapter.features.shops && /\bshop\b/i.test(room.details)) this.enterShop(room.num); // remembered answers only; asking is on request
+      else if (this.state.shop) this.set({ shop: null });
+      if (this.state.lasertag.firedInRoom !== undefined) this.lt({ firedInRoom: undefined });
     }
+    this.mapper.add(room);
+    this.set({ room, mapVersion: this.state.mapVersion + 1 });
+  }
+
+  /** A channel message, from whichever GMCP package the game uses. */
+  addChat(m: Omit<ChatMsg, 'id' | 'at'>) {
+    if (!plain(m.msg).trim()) return;
+    const chat = this.state.chat.concat({ ...m, id: nextId++, at: Date.now() }).slice(-CHAT_MAX);
+    this.set({ chat });
+    saveChat(chat);
   }
 
   dismissDeath() { this.set({ death: null }); }
@@ -1104,7 +1014,7 @@ export class Game {
    * Remember what Aardwolf's map showed: shops and clan halls on visited rooms, and every unvisited
    * room (terrain, passages, shop) relative to where you stood, so the area map keeps them.
    */
-  private noteMapMarks() {
+  noteMapMarks() {
     const room = this.state.room;
     const grid = room && parseAsciiMap(this.state.asciiMap.map(plain));
     if (!room || !grid) return;
@@ -1204,15 +1114,11 @@ export class Game {
 
   private setupAfterLogin() {
     this.setupPending = false;
-    if (this.ire) {
-      this.gmcp('Char.Items.Inv');
-      this.gmcp('Comm.Channel.Players');
-      this.refreshMap(800);
-      return;
-    }
-    this.gmcp('request char');
-    this.gmcp('request room');
-    // Ask which tags exist, then enable the room-related ones we know how to parse.
+    this.adapter.afterLogin(this);
+  }
+
+  /** Aardwolf: ask which {tags} exist, then turn on the room-related ones we know how to parse. */
+  setupTags() {
     this.captureReply('tags', /^Tag Name\s/, (lines) => {
       this.set({ tagsListing: lines });
       // Only the first column names a tag; descriptions mention {rdesc} etc., which aren't valid names.
@@ -1224,12 +1130,6 @@ export class Game {
       this.hideMatching = { re: new RegExp(`\\b(${enable.join('|')})\\b`, 'i'), until: Date.now() + 4000 };
       for (const t of enable) this.hidden(`tags ${t} on`);
     });
-    this.refreshInventory(300);
-    setTimeout(() => this.requestTellHistory(), 700);
-    setTimeout(() => this.refreshObjectives(), 1200);
-    this.refreshMap(1600);
-    setTimeout(() => this.refreshNotes(), 2200);
-    setTimeout(() => this.syncTime(), 2600);
   }
 }
 
@@ -1245,23 +1145,8 @@ function loadPromptRe(): RegExp | null {
   try { const s = localStorage.getItem(PROMPT_KEY); return s ? promptRegExp(s) : null; } catch { return null; }
 }
 
-type CaptureCb = (lines: string[], segs: Seg[][]) => void;
 
-function trimBlankLines(lines: Seg[][]): Seg[][] {
-  let a = 0, b = lines.length;
-  while (a < b && !plain(lines[a]).trim()) a++;
-  while (b > a && !plain(lines[b - 1]).trim()) b--;
-  return lines.slice(a, b);
-}
 
-/** Split a `map` reply into the map itself and anything else that arrived in between. */
-export function extractMap(lines: Seg[][]): { map: Seg[][]; rest: Seg[][] } {
-  const texts = lines.map((l) => plain(l).trim());
-  const start = texts.indexOf('<MAPSTART>');
-  const end = texts.indexOf('<MAPEND>', start + 1);
-  if (start < 0 || end < 0) return { map: trimBlankLines(lines), rest: [] }; // map tag off: whole reply is the map
-  return { map: trimBlankLines(lines.slice(start + 1, end)), rest: [...lines.slice(0, start), ...lines.slice(end + 1)] };
-}
 
 // First line of a `campaign check` reply, whether or not you're on one.
 const CAMPAIGN_START = /^\s*(You are not currently on a campaign|The targets for this campaign|You still have to kill|You have .* to finish this campaign|Note: One or more target names)/;
@@ -1324,11 +1209,6 @@ function saveChat(chat: ChatMsg[]) {
   }, 500);
 }
 
-function mapNums(o: Record<string, unknown>) {
-  const out: Record<string, number> = {};
-  for (const [k, v] of Object.entries(o ?? {})) out[k] = num(v);
-  return out;
-}
 
 function parseInv(line: string): InvItem | null {
   // objectid,flags,itemname,level,type,unique,wear-loc,timer — the name may itself contain commas.

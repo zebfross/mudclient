@@ -2,8 +2,20 @@
 export interface QuickAction { id: string; label: string; cmd: string }
 
 const KEY = 'gaslamp.quick.v1';
-export const DEFAULT_QUICK: QuickAction[] = ['look', 'score', 'where', 'quest info', 'campaign check', 'affects', 'scan', 'recall']
-  .map((c) => ({ id: c, label: '', cmd: c }));
+/** Quick actions from plain commands (each game has its own defaults). */
+export const quickDefaults = (cmds: string[]): QuickAction[] => cmds.map((c) => ({ id: c, label: '', cmd: c }));
+export const DEFAULT_QUICK: QuickAction[] = quickDefaults(['look', 'score', 'where', 'quest info', 'campaign check', 'affects', 'scan', 'recall']);
+
+/** The list you saved, or null if you never changed the defaults. */
+export function loadSavedQuick(): QuickAction[] | null {
+  try {
+    const raw = localStorage.getItem(KEY);
+    const list = raw ? (JSON.parse(raw) as QuickAction[]) : null;
+    if (Array.isArray(list)) return list.filter((q) => q && typeof q.cmd === 'string');
+  } catch { /* storage unavailable or corrupt */ }
+  return null;
+}
+export function clearQuick() { try { localStorage.removeItem(KEY); } catch { /* ignore */ } }
 
 export const newId = () => Math.random().toString(36).slice(2, 10);
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
+import { adapterFor } from '../lib/games/index.ts';
 import { stripAard } from '../lib/aardColor.ts';
 import { Bar, Icon } from './ui.tsx';
 import { GameClock } from './Sky.tsx';
@@ -46,6 +47,7 @@ function Need({ kind, value }: { kind: 'hunger' | 'thirst'; value?: number }) {
 export function Header() {
   const s = useGame();
   const { base, vitals, maxstats, status, worth } = s.char;
+  const features = adapterFor(s.mud.family).features;
   const name = base?.name ?? 'Wanderer';
   return (
     <header className="fixed top-0 inset-x-0 z-50 bg-surface-lowest/95 backdrop-blur-md shadow-[0_4px_20px_rgba(0,0,0,0.85)] border-b border-surface-high/40">
@@ -60,12 +62,12 @@ export function Header() {
 
         <div className="hidden md:flex items-center gap-4 px-3.5 py-1.5 rounded border border-surface-high/30 bg-surface-lowest/40 shadow-inner">
           <div className="hidden xl:flex items-center gap-1.5 whitespace-nowrap" title="Your local time"><Icon name="schedule" className="text-outline text-sm" /><Clock /></div>
-          <GameClock />
+          {features.gameClock && <GameClock />}
           <div className="hidden xl:block h-3.5 w-px bg-surface-high" />
           <Vital label="HP" value={vitals?.hp} max={maxstats?.maxhp} color="bg-[#d4574a]" labelColor="text-[#ff7b6b]" />
           <Vital label="MN" value={vitals?.mana} max={maxstats?.maxmana} color="bg-tertiary-container" labelColor="text-tertiary" />
-          <Vital label={s.mud.family === 'ire' ? 'EP' : 'MV'} value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
-          {s.mud.family === 'aardwolf' && <>
+          <Vital label={features.movesLabel} value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
+          {features.hungerThirst && <>
           <Need kind="hunger" value={status?.hunger === undefined ? undefined : Number(status.hunger)} />
           <Need kind="thirst" value={status?.thirst === undefined ? undefined : Number(status.thirst)} />
           </>}

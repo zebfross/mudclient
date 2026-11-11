@@ -1,19 +1,22 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { game, useGame } from '../lib/store.ts';
-import { DEFAULT_QUICK, loadQuick, move, newId, quickLabel, saveQuick, splitCommands, type QuickAction } from '../lib/quick.ts';
+import { clearQuick, loadSavedQuick, move, newId, quickDefaults, quickLabel, saveQuick, splitCommands, type QuickAction } from '../lib/quick.ts';
 import { Icon, NOT_A_LOGIN } from './ui.tsx';
 
 const CHIP = 'px-2.5 py-1 rounded font-mono text-[11px] uppercase shrink-0 border';
 
 /** The command bar's row of one-click actions. The pencil switches to editing. */
 export function QuickBar() {
-  const { connected } = useGame();
-  const [list, setList] = useState<QuickAction[]>(loadQuick);
+  const { connected, mud } = useGame();
+  // Until you edit them, the buttons are this game's defaults (Achaea's differ from Aardwolf's).
+  const defaults = useMemo(() => quickDefaults(game.adapter.quickCommands), [mud.family]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [saved, setSaved] = useState<QuickAction[] | null>(loadSavedQuick);
+  const list = saved ?? defaults;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<QuickAction | null>(null);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
 
-  const update = (next: QuickAction[]) => { setList(next); saveQuick(next); };
+  const update = (next: QuickAction[]) => { setSaved(next); saveQuick(next); };
   const run = (q: QuickAction) => game.commands(splitCommands(q.cmd));
   const saveDraft = () => {
     if (!draft || !splitCommands(draft.cmd).length) return;
@@ -60,7 +63,7 @@ export function QuickBar() {
       </div>
         <span className="flex items-center gap-1 shrink-0">
           {editing && (
-            <button type="button" onClick={() => { update(DEFAULT_QUICK); setDraft(null); }}
+            <button type="button" onClick={() => { setSaved(null); clearQuick(); setDraft(null); }}
               title="Back to the default actions" className="font-mono text-[10px] uppercase text-outline hover:text-on-surface px-1">Reset</button>
           )}
           <button type="button" onClick={() => { setEditing(!editing); setDraft(null); }}
