@@ -10,13 +10,14 @@ const DIR_SHORT: Record<string, string> = {
 };
 // "--- Area 430: The Pygmy Dungeons - v41111 ---" … "--- A dark, dank cell ------ 0:0:0 ---"
 const MAP_START = /^\s*--- Area \d+: .* ---\s*$/;
+const PROMPT_RE = /^\s*\d+h, \d+m(?:, \d+[a-z])*\s+([a-z@]*)-/;
 const MAP_END = /^\s*--- .* -?\d+:-?\d+:-?\d+ ---\s*$/;
 
 export const ire: GameAdapter = {
   family: 'ire',
   features: {
     hungerThirst: false, notes: false, objectives: false, shops: false, lasertag: false,
-    gameClock: false, coords: false, diagonals: true, movesLabel: 'EP',
+    gameClock: false, coords: false, diagonals: true, balance: true, movesLabel: 'EP',
   },
   quickCommands: ['look', 'score', 'inventory', 'qw', 'map', 'help'],
 
@@ -42,6 +43,11 @@ export const ire: GameAdapter = {
         vitals: { hp: num(data.hp), mana: num(data.mp), moves: num(data.ep) },
         maxstats: { ...char.maxstats, maxhp: num(data.maxhp), maxmana: num(data.maxmp), maxmoves: num(data.maxep) },
         ire: { ...char.ire, vitals: data },
+        // "1" / "0". Not every IRE game sends them; the prompt's flags are the fallback.
+        ...(data.bal !== undefined || data.eq !== undefined ? { ready: {
+          balance: data.bal !== undefined ? String(data.bal) === '1' : char.ready?.balance ?? true,
+          equilibrium: data.eq !== undefined ? String(data.eq) === '1' : char.ready?.equilibrium ?? true,
+        } } : {}),
       } });
     } else if (p === 'char.name') {
       host.set({ char: { ...char, base: { ...char.base, name: String(data.name ?? ''), fullname: String(data.fullname ?? '') } } });
@@ -64,6 +70,15 @@ export const ire: GameAdapter = {
     } else if (p === 'comm.channel.text') {
       host.addChat({ chan: String(data.channel ?? ''), player: String(data.talker ?? ''), msg: new AnsiParser().parse(String(data.text ?? '')) });
     }
+  },
+
+  // "272h, 385m, 800e, 800w ex-": e = equilibrium, x = balance (other letters: prone, blind…).
+  onPrompt(host, text) {
+    const flags = PROMPT_RE.exec(text)?.[1];
+    if (flags === undefined) return;
+    const ready = { balance: flags.includes('x'), equilibrium: flags.includes('e') };
+    const had = host.state.char.ready;
+    if (had?.balance !== ready.balance || had?.equilibrium !== ready.equilibrium) host.set({ char: { ...host.state.char, ready } });
   },
 
   // Only the map so far: other Aardwolf-style lookups would print junk here.

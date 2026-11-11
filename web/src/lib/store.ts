@@ -126,6 +126,8 @@ export interface State {
     status?: Record<string, any>;
     worth?: Record<string, number>;
     ire?: { vitals?: Record<string, string>; status?: Record<string, string> };
+    /** Iron Realms: can you act? Balance (body) and equilibrium (mind). */
+    ready?: { balance: boolean; equilibrium: boolean };
   };
   room?: RoomInfo;
   roomDesc: string[];
@@ -842,7 +844,7 @@ export class Game implements Host {
     }
 
     if (isPrompt) {
-      if (text.trim()) this.learnPrompt(text);
+      if (text.trim()) { this.learnPrompt(text); this.adapter.onPrompt?.(this, text); }
       const ch = parseCharges(text);
       if (ch) this.lt({ charges: ch.charges, maxCharges: ch.max ?? Math.max(this.state.lasertag.maxCharges ?? 0, ch.charges), chargesAt: Date.now() });
       if (this.mirror) { this.endMirror(); }

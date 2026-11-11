@@ -6,6 +6,27 @@ import { Bar, Icon } from './ui.tsx';
 import { GameClock } from './Sky.tsx';
 import { GAMES, currentGame, switchGame } from '../lib/gameChoice.ts';
 
+/** Iron Realms: balance (body) and equilibrium (mind). Lit when you have it; most actions need both. */
+function Ready({ ready }: { ready?: { balance: boolean; equilibrium: boolean } }) {
+  const chip = (on: boolean | undefined, short: string, name: string, why: string) => (
+    <span
+      title={on === undefined ? `${name}: unknown` : on ? `${name}: ready` : `${name}: recovering (${why})`}
+      aria-label={on === undefined ? `${name} unknown` : on ? `${name} ready` : `${name} recovering`}
+      className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold border transition-colors ${
+        on === undefined ? 'text-outline border-surface-high/40'
+          : on ? 'text-[#7fdc9a] border-[#7fdc9a]/50 bg-[#7fdc9a]/10'
+          : 'text-outline/70 border-surface-high/40 line-through'
+      }`}
+    >{short}</span>
+  );
+  return (
+    <div className="flex items-center gap-1">
+      {chip(ready?.balance, 'BAL', 'Balance', 'physical actions must wait')}
+      {chip(ready?.equilibrium, 'EQ', 'Equilibrium', 'mental actions must wait')}
+    </div>
+  );
+}
+
 /** Which game to play. Switching reloads the page with that game's own login, map and history. */
 function GamePicker() {
   const { loggedIn } = useGame();
@@ -88,6 +109,7 @@ export function Header() {
           <Vital label="HP" value={vitals?.hp} max={maxstats?.maxhp} color="bg-[#d4574a]" labelColor="text-[#ff7b6b]" />
           <Vital label="MN" value={vitals?.mana} max={maxstats?.maxmana} color="bg-tertiary-container" labelColor="text-tertiary" />
           <Vital label={features.movesLabel} value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
+          {features.balance && <Ready ready={s.char.ready} />}
           {features.hungerThirst && <>
           <Need kind="hunger" value={status?.hunger === undefined ? undefined : Number(status.hunger)} />
           <Need kind="thirst" value={status?.thirst === undefined ? undefined : Number(status.thirst)} />

@@ -139,4 +139,24 @@ function setup() {
   assert.ok(g.state.loggedIn);
 }
 
+// Balance and equilibrium: from GMCP when sent, and from the prompt's flags ("ex-") either way.
+{
+  const { g } = setup();
+  g.onMessage({ t: 'gmcp', pkg: 'Char.Name', data: { name: 'Finch' } });
+  g.onMessage({ t: 'gmcp', pkg: 'Char.Vitals', data: { hp: '350', maxhp: '350', bal: '0', eq: '1' } });
+  assert.deepEqual(g.state.char.ready, { balance: false, equilibrium: true });
+  const prompt = (t: string) => { g.onMessage({ t: 'text', d: t }); g.onMessage({ t: 'prompt' }); };
+  prompt('350h, 385m, 600e, 600w ex-');
+  assert.deepEqual(g.state.char.ready, { balance: true, equilibrium: true });
+  prompt('350h, 385m, 600e, 600w e-');
+  assert.deepEqual(g.state.char.ready, { balance: false, equilibrium: true }, 'off balance');
+  prompt('350h, 385m, 600e, 600w px-');
+  assert.deepEqual(g.state.char.ready, { balance: true, equilibrium: false }, 'prone, no equilibrium');
+  prompt('350h, 385m, 600e, 600w -');
+  assert.deepEqual(g.state.char.ready, { balance: false, equilibrium: false });
+  g.onMessage({ t: 'text', d: 'You see exits leading east and west.\r\n' });
+  assert.deepEqual(g.state.char.ready, { balance: false, equilibrium: false }, 'ordinary text changes nothing');
+  assert.equal(new Game().adapter.features.balance, false, 'Aardwolf has no balance');
+}
+
 console.log('ire tests passed');

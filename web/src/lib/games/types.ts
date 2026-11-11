@@ -16,6 +16,7 @@ export interface Features {
   gameClock: boolean;    // in-game time in the header
   coords: boolean;       // continent x,y on the map
   diagonals: boolean;    // ne/nw/se/sw exits: compass corners
+  balance: boolean;      // Iron Realms balance / equilibrium in the header
   movesLabel: string;    // third vitals bar: "MV" (moves) or "EP" (endurance)
 }
 
@@ -64,6 +65,8 @@ export interface GameAdapter {
   onGmcp(host: Host, pkg: string, data: any): void;
   /** May this command be sent quietly in the background? */
   allowsQuiet(cmd: string): boolean;
+  /** Each prompt line, for state that only the prompt shows. */
+  onPrompt?(host: Host, text: string): void;
   /** Fetch the game's own map quietly into state.asciiMap. */
   fetchMap(host: Host): void;
 

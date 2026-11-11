@@ -10,7 +10,7 @@ export const aardwolf: GameAdapter = {
   family: 'aardwolf',
   features: {
     hungerThirst: true, notes: true, objectives: true, shops: true, lasertag: true,
-    gameClock: true, coords: true, diagonals: false, movesLabel: 'MV',
+    gameClock: true, coords: true, diagonals: false, balance: false, movesLabel: 'MV',
   },
   quickCommands: ['look', 'score', 'where', 'quest info', 'campaign check', 'affects', 'scan', 'recall'],
 
