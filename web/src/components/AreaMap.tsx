@@ -155,6 +155,7 @@ export function AreaMap() {
         onPointerUp={() => { drag.current = null; }}
         onPointerCancel={() => { drag.current = null; }}
       >
+        <UpDown />
         {view && (
           <svg className="absolute inset-0" width="100%" height="100%" role="img" aria-label={`Map of ${layout.zone}`}>
             <g transform={`translate(${view.x - (pos.get(room.num)?.x ?? 0) * CELL * view.k},${view.y - (pos.get(room.num)?.y ?? 0) * CELL * view.k}) scale(${view.k})`}>
@@ -216,3 +217,32 @@ export function AreaMap() {
   );
 }
 
+
+/** Up/down can't be drawn on a flat map, so they get their own buttons over its corner. */
+function UpDown() {
+  const { room } = useGame();
+  if (!room) return null;
+  const btn = (dir: 'u' | 'd', icon: string, label: string) => {
+    const to = room.exits[dir];
+    const dest = to ? game.mapper.rooms.get(to)?.name : undefined;
+    return (
+      <button
+        className="btn px-2 py-1.5 shadow-lg bg-surface-low/90 disabled:opacity-30 disabled:cursor-not-allowed"
+        disabled={to === undefined}
+        onClick={() => game.walk([dir])}
+        aria-label={`Go ${label}`}
+        title={to === undefined ? `No way ${label} from here` : `Go ${label}${dest ? ` to ${dest}` : ' (not visited yet)'}`}
+      >
+        <Icon name={icon} className="text-base" />
+        <span className="font-mono text-[11px]">{label}</span>
+      </button>
+    );
+  };
+  return (
+    // Stop the pointer reaching the map, which would start a drag instead of a click.
+    <div className="absolute bottom-2 right-2 z-10 flex flex-col gap-1.5" onPointerDown={(e) => e.stopPropagation()}>
+      {btn('u', 'arrow_upward', 'up')}
+      {btn('d', 'arrow_downward', 'down')}
+    </div>
+  );
+}
