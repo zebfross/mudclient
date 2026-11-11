@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
+import { gameKey } from '../lib/gameChoice.ts';
 import { game, useGame } from '../lib/store.ts';
 import { Icon } from './ui.tsx';
 
-const AUTO_KEY = 'gaslamp.autoLogin';
-const NAME_KEY = 'gaslamp.loginName';
+const AUTO_KEY = gameKey('gaslamp.autoLogin');
+const NAME_KEY = gameKey('gaslamp.loginName');
 const read = (k: string) => { try { return localStorage.getItem(k) ?? ''; } catch { return ''; } };
 const write = (k: string, v: string) => { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch { /* ignore */ } };
 
@@ -26,7 +27,7 @@ async function getFromBrowser(): Promise<PasswordCred | null> {
 // With "remember me" on, the login is saved in this browser's local storage for this site, so any
 // tab can log back in: after a reload, a closed tab, or Aardwolf dropping an idle connection.
 // It's plain text in your browser profile, so only use it on your own computer.
-const SAVED_KEY = 'gaslamp.savedLogin';
+const SAVED_KEY = gameKey('gaslamp.savedLogin');
 type Saved = { name: string; password: string };
 function loadSaved(): Saved | null {
   try {

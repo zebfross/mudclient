@@ -1,5 +1,6 @@
 // Game state: turns the relay's text/GMCP stream into structured UI state.
 import { useSyncExternalStore } from 'react';
+import { currentGame, gameKey } from './gameChoice.ts';
 import { AnsiParser, plain, type Seg } from './ansi.ts';
 import { aardSegs, stripAard } from './aardColor.ts';
 import { adapterFor, type GameAdapter, type Host } from './games/index.ts';
@@ -49,7 +50,7 @@ export function parseValueReply(text: string): { keeper: string; gold: number | 
   if (/cannot be sold|can'?t be sold/i.test(text)) return { keeper: '', gold: null, why: 'can’t be sold to a shop' };
   return null;
 }
-const SHOPS_KEY = 'gaslamp.shops.v1';
+const SHOPS_KEY = gameKey('gaslamp.shops.v1');
 function loadShops(): Map<number, ShopOffers> {
   try { return new Map((JSON.parse(localStorage.getItem(SHOPS_KEY) ?? '[]') as ShopOffers[]).map((e) => [e.room, e])); } catch { return new Map(); }
 }
@@ -184,7 +185,7 @@ function stripPrefix(segs: Seg[], n: number): Seg[] {
 
 export class Game implements Host {
   state: State = {
-    mud: { game: 'aardwolf', family: 'aardwolf' },
+    mud: { game: currentGame.id, family: currentGame.family },
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
     inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, shopAsking: false, noteEditor: false, lasertag: emptyLasertag(),
@@ -1133,7 +1134,7 @@ export class Game implements Host {
   }
 }
 
-const PROMPT_KEY = 'gaslamp.promptSample';
+const PROMPT_KEY = gameKey('gaslamp.promptSample');
 
 /** "[158/158hp 189mn] >" → /^\[\d+\/\d+hp \d+mn\] > ?/ */
 export function promptRegExp(sample: string) {
@@ -1181,11 +1182,11 @@ export function replyTarget(c: ChatMsg) {
   return /^You tell (\S+)/.exec(t)?.[1] ?? /^(\S+) tells you/.exec(t)?.[1] ?? stripAard(c.player);
 }
 
-const CHAT_KEY = 'gaslamp.chat.v1';
+const CHAT_KEY = gameKey('gaslamp.chat.v1');
 const CHAT_MAX = 400;
 let chatSaveTimer: ReturnType<typeof setTimeout> | undefined;
 
-const ITEMS_KEY = 'gaslamp.items.v1';
+const ITEMS_KEY = gameKey('gaslamp.items.v1');
 function loadItemDetails(): Record<string, ItemDetails> {
   try { return JSON.parse(localStorage.getItem(ITEMS_KEY) ?? '{}'); } catch { return {}; }
 }

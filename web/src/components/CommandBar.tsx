@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
+import { gameKey } from '../lib/gameChoice.ts';
 import { game, useGame } from '../lib/store.ts';
 import { Icon, NOT_A_LOGIN } from './ui.tsx';
 import { QuickBar } from './QuickBar.tsx';
 import { addHistory, searchHistory } from '../lib/history.ts';
 
-const HISTORY_KEY = 'gaslamp.history.v1';
+const HISTORY_KEY = gameKey('gaslamp.history.v1');
 
 function loadHistory(): string[] {
   try {

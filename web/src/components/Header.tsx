@@ -4,6 +4,27 @@ import { adapterFor } from '../lib/games/index.ts';
 import { stripAard } from '../lib/aardColor.ts';
 import { Bar, Icon } from './ui.tsx';
 import { GameClock } from './Sky.tsx';
+import { GAMES, currentGame, switchGame } from '../lib/gameChoice.ts';
+
+/** Which game to play. Switching reloads the page with that game's own login, map and history. */
+function GamePicker() {
+  const { loggedIn } = useGame();
+  return (
+    <label className="relative mt-1 flex items-center gap-0.5 label-caps text-[8px] text-outline font-medium hover:text-on-surface cursor-pointer">
+      <span className="sr-only">Game</span>
+      <select
+        value={currentGame.id}
+        // The game you leave stays connected for 10 minutes, so switching straight back resumes it.
+        onChange={(e) => switchGame(e.target.value)}
+        title={loggedIn ? `Switch game (${currentGame.name} stays connected for 10 minutes)` : 'Switch game'}
+        className="appearance-none bg-transparent pr-3 cursor-pointer uppercase tracking-[inherit] focus:outline-none focus-visible:ring-1 focus-visible:ring-primary rounded"
+      >
+        {GAMES.map((g) => <option key={g.id} value={g.id} className="bg-surface-lowest text-on-surface normal-case">{g.name}</option>)}
+      </select>
+      <Icon name="expand_more" className="absolute right-0 text-[10px] pointer-events-none" />
+    </label>
+  );
+}
 
 function Clock() {
   const [now, setNow] = useState(() => new Date());
@@ -56,7 +77,7 @@ export function Header() {
           <Icon name="local_fire_department" className="text-primary text-2xl" />
           <div className="flex flex-col leading-none">
             <span className="font-display text-[16px] text-primary tracking-wide">Gaslamp</span>
-            <span className="label-caps text-[8px] text-outline font-medium mt-1">{game.gameName} Link</span>
+            <GamePicker />
           </div>
         </div>
 

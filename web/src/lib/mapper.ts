@@ -1,5 +1,6 @@
 // Room graph built from GMCP room.info, persisted in localStorage.
 import { stripAard } from './aardColor.ts';
+import { gameKey } from './gameChoice.ts';
 
 export interface RoomInfo {
   num: number;
@@ -13,8 +14,8 @@ export interface RoomInfo {
   mark?: string;
 }
 
-const KEY = 'gaslamp.rooms.v1';
-const SEEN_KEY = 'gaslamp.seen.v1';
+const KEY = gameKey('gaslamp.rooms.v1');
+const SEEN_KEY = gameKey('gaslamp.seen.v1');
 
 /** A room seen on Aardwolf's map but never visited, stored relative to the room it was seen from. */
 export interface SeenCell {

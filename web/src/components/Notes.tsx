@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
+import { gameKey } from '../lib/gameChoice.ts';
 import { game, useGame, type NoteDraft } from '../lib/store.ts';
 import { stripAard } from '../lib/aardColor.ts';
 import { CardHead, Empty, Icon, NOT_A_LOGIN, SegText } from './ui.tsx';
 
-const DRAFT_KEY = 'gaslamp.noteDraft';
+const DRAFT_KEY = gameKey('gaslamp.noteDraft');
 const loadDraft = (): NoteDraft | null => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null'); } catch { return null; } };
 const saveDraft = (d: NoteDraft | null) => { try { if (d) localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); else localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ } };
 

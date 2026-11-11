@@ -16,10 +16,15 @@ const PROFILES = {
   achaea: { family: 'ire', host: 'achaea.com', port: 23, gmcp: ['Char 1', 'Char.Items 1', 'Char.Skills 1', 'Room 1', 'Comm.Channel 1', 'IRE.Rift 1', 'IRE.Target 1'] },
 } as const;
 type GameId = keyof typeof PROFILES;
-const GAME: GameId = (process.env.MUD ?? 'aardwolf') in PROFILES ? (process.env.MUD ?? 'aardwolf') as GameId : 'aardwolf';
-const PROFILE = PROFILES[GAME];
-const MUD_HOST = process.env.MUD_HOST ?? PROFILE.host;
-const MUD_PORT = Number(process.env.MUD_PORT ?? PROFILE.port);
+const isGame = (g: unknown): g is GameId => typeof g === 'string' && g in PROFILES;
+// The game for browsers that don't say (MUD=achaea). The browser normally picks one in the header.
+const DEFAULT_GAME: GameId = isGame(process.env.MUD) ? process.env.MUD : 'aardwolf';
+/** Where to connect. MUD_HOST/MUD_PORT override the default game's address (e.g. a local test MUD). */
+function target(game: GameId) {
+  const p = PROFILES[game];
+  const local = game === DEFAULT_GAME;
+  return { ...p, host: (local && process.env.MUD_HOST) || p.host, port: Number((local && process.env.MUD_PORT) || p.port) };
+}
 const DIST = path.resolve(import.meta.dirname, '../web/dist');
 const MIME: Record<string, string> = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -42,6 +47,7 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 const DETACHED_TTL = 10 * 60_000;
 const BACKLOG_MAX = 5000;
 interface Session {
+  game: GameId;
   mud: TelnetClient | null;
   ws: WebSocket | null;
   backlog: string[];
@@ -57,10 +63,11 @@ function send(sess: Session, msg: object) {
 
 function connectMud(sess: Session) {
   sess.mud?.close();
-  send(sess, { t: 'status', connected: false, msg: `Connecting to ${MUD_HOST}:${MUD_PORT}…` });
+  const t = target(sess.game);
+  send(sess, { t: 'status', connected: false, msg: `Connecting to ${t.host}:${t.port}…` });
   const m = new TelnetClient({
-    host: MUD_HOST, port: MUD_PORT, clientName: 'Gaslamp',
-    gmcpSupports: [...PROFILE.gmcp],
+    host: t.host, port: t.port, clientName: 'Gaslamp',
+    gmcpSupports: [...t.gmcp],
   });
   sess.mud = m;
   m.on('open', () => send(sess, { t: 'status', connected: true }));
@@ -79,18 +86,22 @@ wss.on('connection', (ws: WebSocket) => {
     try { msg = JSON.parse(String(raw)); } catch { return; }
     if (msg.t === 'hello') {
       const id = typeof msg.session === 'string' ? msg.session.slice(0, 64) : '';
-      const existing = id ? sessions.get(id) : undefined;
+      const game: GameId = isGame(msg.game) ? msg.game : DEFAULT_GAME;
+      const found = id ? sessions.get(id) : undefined;
+      // A session id belongs to one game; asked for another, start fresh rather than cross wires.
+      const existing = found?.game === game ? found : undefined;
+      if (found && !existing) { found.mud?.close(); sessions.delete(id); }
       if (existing) {
         clearTimeout(existing.expiry);
         existing.ws?.close();
         existing.ws = ws;
         sess = existing;
-        ws.send(JSON.stringify({ t: 'session', resumed: !!existing.mud, game: GAME, family: PROFILE.family }));
+        ws.send(JSON.stringify({ t: 'session', resumed: !!existing.mud, game, family: PROFILES[game].family }));
         for (const m of existing.backlog.splice(0)) ws.send(m);
       } else {
-        sess = { mud: null, ws, backlog: [] };
+        sess = { game, mud: null, ws, backlog: [] };
         if (id) sessions.set(id, sess);
-        ws.send(JSON.stringify({ t: 'session', resumed: false, game: GAME, family: PROFILE.family }));
+        ws.send(JSON.stringify({ t: 'session', resumed: false, game, family: PROFILES[game].family }));
       }
       return;
     }
@@ -112,4 +123,4 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-server.listen(PORT, () => console.log(`relay on http://localhost:${PORT} → ${GAME} (${MUD_HOST}:${MUD_PORT})`));
+server.listen(PORT, () => console.log(`relay on http://localhost:${PORT} → ${Object.keys(PROFILES).join(', ')} (default ${DEFAULT_GAME}: ${target(DEFAULT_GAME).host}:${target(DEFAULT_GAME).port})`));

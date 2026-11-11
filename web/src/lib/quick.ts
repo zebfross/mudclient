@@ -1,7 +1,8 @@
 // The command bar's Quick actions: user-editable, saved in this browser.
+import { gameKey } from './gameChoice.ts';
 export interface QuickAction { id: string; label: string; cmd: string }
 
-const KEY = 'gaslamp.quick.v1';
+const KEY = gameKey('gaslamp.quick.v1');
 /** Quick actions from plain commands (each game has its own defaults). */
 export const quickDefaults = (cmds: string[]): QuickAction[] => cmds.map((c) => ({ id: c, label: '', cmd: c }));
 export const DEFAULT_QUICK: QuickAction[] = quickDefaults(['look', 'score', 'where', 'quest info', 'campaign check', 'affects', 'scan', 'recall']);

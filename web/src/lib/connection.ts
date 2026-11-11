@@ -1,13 +1,17 @@
 // Browser ↔ relay WebSocket. The relay keeps the MUD session alive across reloads, keyed by a
 // per-tab session id, so refreshing the page reattaches instead of logging out.
 import { game } from './store.ts';
+import { currentGame, gameKey } from './gameChoice.ts';
 
 let ws: WebSocket | null = null;
 
 function sessionId() {
   try {
-    let id = sessionStorage.getItem('gaslamp.session');
-    if (!id) { id = crypto.randomUUID(); sessionStorage.setItem('gaslamp.session', id); }
+    // One session per game: switching away leaves the other game's connection to time out on its
+    // own, so switching straight back picks it up again.
+    const key = gameKey('gaslamp.session');
+    let id = sessionStorage.getItem(key);
+    if (!id) { id = crypto.randomUUID(); sessionStorage.setItem(key, id); }
     return id;
   } catch { return crypto.randomUUID(); }
 }
@@ -15,7 +19,7 @@ function sessionId() {
 export function startConnection() {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`;
   ws = new WebSocket(url);
-  ws.onopen = () => ws!.send(JSON.stringify({ t: 'hello', session: sessionId() }));
+  ws.onopen = () => ws!.send(JSON.stringify({ t: 'hello', session: sessionId(), game: currentGame.id }));
   ws.onmessage = (e) => {
     let msg: any;
     try { msg = JSON.parse(e.data); } catch { return; }
