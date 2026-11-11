@@ -54,7 +54,7 @@ export function Header() {
           <Icon name="local_fire_department" className="text-primary text-2xl" />
           <div className="flex flex-col leading-none">
             <span className="font-display text-[16px] text-primary tracking-wide">Gaslamp</span>
-            <span className="label-caps text-[8px] text-outline font-medium mt-1">Aardwolf Link</span>
+            <span className="label-caps text-[8px] text-outline font-medium mt-1">{game.gameName} Link</span>
           </div>
         </div>
 
@@ -64,9 +64,11 @@ export function Header() {
           <div className="hidden xl:block h-3.5 w-px bg-surface-high" />
           <Vital label="HP" value={vitals?.hp} max={maxstats?.maxhp} color="bg-[#d4574a]" labelColor="text-[#ff7b6b]" />
           <Vital label="MN" value={vitals?.mana} max={maxstats?.maxmana} color="bg-tertiary-container" labelColor="text-tertiary" />
-          <Vital label="MV" value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
+          <Vital label={s.mud.family === 'ire' ? 'EP' : 'MV'} value={vitals?.moves} max={maxstats?.maxmoves} color="bg-primary" labelColor="text-primary" />
+          {s.mud.family === 'aardwolf' && <>
           <Need kind="hunger" value={status?.hunger === undefined ? undefined : Number(status.hunger)} />
           <Need kind="thirst" value={status?.thirst === undefined ? undefined : Number(status.thirst)} />
+          </>}
           <div className="h-3.5 w-px bg-surface-high" />
           <div className="flex items-center gap-1" title="Gold on hand">
             <Icon name="monetization_on" className="text-secondary text-sm" />

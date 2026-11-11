@@ -8,8 +8,18 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { TelnetClient } from './telnet.ts';
 
 const PORT = Number(process.env.PORT ?? 4321);
-const MUD_HOST = process.env.MUD_HOST ?? 'aardmud.org';
-const MUD_PORT = Number(process.env.MUD_PORT ?? 4000);
+
+// Which game this relay connects to. MUD=achaea picks Iron Realms' Achaea; MUD_HOST/MUD_PORT override.
+// `family` tells the browser which game's conventions (GMCP shapes, login, commands) to expect.
+const PROFILES = {
+  aardwolf: { family: 'aardwolf', host: 'aardmud.org', port: 4000, gmcp: ['Char 1', 'Room 1', 'Comm 1', 'Group 1'] },
+  achaea: { family: 'ire', host: 'achaea.com', port: 23, gmcp: ['Char 1', 'Char.Items 1', 'Char.Skills 1', 'Room 1', 'Comm.Channel 1', 'IRE.Rift 1', 'IRE.Target 1'] },
+} as const;
+type GameId = keyof typeof PROFILES;
+const GAME: GameId = (process.env.MUD ?? 'aardwolf') in PROFILES ? (process.env.MUD ?? 'aardwolf') as GameId : 'aardwolf';
+const PROFILE = PROFILES[GAME];
+const MUD_HOST = process.env.MUD_HOST ?? PROFILE.host;
+const MUD_PORT = Number(process.env.MUD_PORT ?? PROFILE.port);
 const DIST = path.resolve(import.meta.dirname, '../web/dist');
 const MIME: Record<string, string> = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
@@ -50,7 +60,7 @@ function connectMud(sess: Session) {
   send(sess, { t: 'status', connected: false, msg: `Connecting to ${MUD_HOST}:${MUD_PORT}…` });
   const m = new TelnetClient({
     host: MUD_HOST, port: MUD_PORT, clientName: 'Gaslamp',
-    gmcpSupports: ['Char 1', 'Room 1', 'Comm 1', 'Group 1'],
+    gmcpSupports: [...PROFILE.gmcp],
   });
   sess.mud = m;
   m.on('open', () => send(sess, { t: 'status', connected: true }));
@@ -75,12 +85,12 @@ wss.on('connection', (ws: WebSocket) => {
         existing.ws?.close();
         existing.ws = ws;
         sess = existing;
-        ws.send(JSON.stringify({ t: 'session', resumed: !!existing.mud }));
+        ws.send(JSON.stringify({ t: 'session', resumed: !!existing.mud, game: GAME, family: PROFILE.family }));
         for (const m of existing.backlog.splice(0)) ws.send(m);
       } else {
         sess = { mud: null, ws, backlog: [] };
         if (id) sessions.set(id, sess);
-        ws.send(JSON.stringify({ t: 'session', resumed: false }));
+        ws.send(JSON.stringify({ t: 'session', resumed: false, game: GAME, family: PROFILE.family }));
       }
       return;
     }
@@ -102,4 +112,4 @@ wss.on('connection', (ws: WebSocket) => {
   });
 });
 
-server.listen(PORT, () => console.log(`relay on http://localhost:${PORT} → ${MUD_HOST}:${MUD_PORT}`));
+server.listen(PORT, () => console.log(`relay on http://localhost:${PORT} → ${GAME} (${MUD_HOST}:${MUD_PORT})`));

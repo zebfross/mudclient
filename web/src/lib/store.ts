@@ -84,7 +84,7 @@ const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: []
 export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string; retry?: boolean }
 // Aardwolf's wording isn't documented here, so these are deliberately broad.
 // The question itself, not the banner line above it ("Enter your character name or type 'NEW'…").
-const NAME_PROMPT_RE = /(?:what be thy name|what is your name|by what name)[^?]*\?\s*$|^\s*name\s*:\s*$/i;
+const NAME_PROMPT_RE = /(?:what be thy name|what is your name|by what name)[^?]*\?\s*$|^\s*name\s*:\s*$|enter your character'?s name\.?\s*$/i;
 const WRONG_PASSWORD_RE = /wrong password|incorrect password|password (?:is )?incorrect|invalid password/i;
 // Only checked after the name was sent: the login banner itself mentions creating a new character.
 const NEW_CHAR_RE = /did i get that right|is that (?:right|correct)\?|no such (?:player|character)/i;
@@ -103,7 +103,11 @@ export interface InvItem {
 export interface ChatMsg { id: number; chan: string; player: string; msg: Seg[]; at: number; imported?: boolean }
 export interface GroupMember { name: string; info: Record<string, number | string> }
 
+/** Which game the relay is connected to. `family` decides whose conventions apply. */
+export interface MudInfo { game: string; family: 'aardwolf' | 'ire' }
+
 export interface State {
+  mud: MudInfo;
   connected: boolean;
   status: string;
   localEcho: boolean;
@@ -120,6 +124,7 @@ export interface State {
     stats?: Record<string, number>;
     status?: Record<string, any>;
     worth?: Record<string, number>;
+    ire?: { vitals?: Record<string, string>; status?: Record<string, string> };
   };
   room?: RoomInfo;
   roomDesc: string[];
@@ -180,6 +185,7 @@ function stripPrefix(segs: Seg[], n: number): Seg[] {
 
 export class Game {
   state: State = {
+    mud: { game: 'aardwolf', family: 'aardwolf' },
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
     inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, shopAsking: false, noteEditor: false, lasertag: emptyLasertag(),
@@ -246,8 +252,12 @@ export class Game {
   private connecting = false;
 
   /** The relay's answer to hello: reattach to a live session, or open a new one. */
-  onSession(resumed: boolean) {
+  onSession(resumed: boolean, gameId?: string, family?: string) {
     this.gameDown = false;
+    if (gameId && gameId !== this.state.mud.game) {
+      this.set({ mud: { game: gameId, family: family === 'ire' ? 'ire' : 'aardwolf' } });
+      if (typeof document !== 'undefined') document.title = `Gaslamp · ${this.gameName}`;
+    }
     this.set({ sessionAt: Date.now() });
     if (resumed) this.resume(); else this.connect();
   }
@@ -259,9 +269,15 @@ export class Game {
     // If you're in the game, the character data that comes back logs us in and we look around.
     // (At Aardwolf's login screen a 'look' would be taken as a character name.)
     this.lookAfterLogin = true;
+    // Iron Realms games send Char.Vitals with every prompt, so the next one logs us in by itself.
+    if (this.ire) return;
     this.gmcp('request char');
     this.gmcp('request room');
   }
+  /** The game's display name: "Aardwolf", "Achaea". */
+  get gameName() { const g = this.state.mud.game; return g.charAt(0).toUpperCase() + g.slice(1); }
+  /** An Iron Realms game (Achaea…): none of Aardwolf's tags, background commands or GMCP shapes. */
+  get ire() { return this.state.mud.family === 'ire'; }
   private lookAfterLogin = false;
   disconnect() { this.set({ manualDisconnect: true }); this.cancelSignIn(); this.sendRaw({ t: 'disconnect' }); }
 
@@ -340,7 +356,7 @@ export class Game {
 
   /** Send a command whose next prompt should not be shown. */
   private hidden(cmd: string) {
-    if (this.gameDown || this.writer) return; // in the note editor it would become a line of the note
+    if (this.gameDown || this.writer || this.ire) return; // in the note editor it would become a line of the note
     if (Date.now() > this.suppressPromptsUntil) this.suppressPrompts = 0;
     this.suppressPrompts++;
     this.suppressPromptsUntil = Date.now() + 3000;
@@ -379,7 +395,7 @@ export class Game {
   }
 
   private captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
-    if (this.gameDown) return; // nothing to ask; it would be sent to whatever connects next
+    if (this.gameDown || this.ire) return; // Aardwolf commands and replies only, for now // nothing to ask; it would be sent to whatever connects next
     this.captureQueue.push({ cmd, start, end, cb });
     if (!this.capture) this.nextCapture();
   }
@@ -944,6 +960,11 @@ export class Game {
     }
     const p = pkg.toLowerCase();
     const char = this.state.char;
+    if (this.ire) {
+      this.onIreGmcp(p, data ?? {});
+      if (!this.state.loggedIn && (p.startsWith('char.vitals') || p === 'char.name' || p === 'char.status')) this.onLogin();
+      return;
+    }
     if (p === 'comm.tick') return this.tick();
     if (p === 'char.base') this.set({ char: { ...char, base: data } });
     else if (p === 'char.vitals') this.set({ char: { ...char, vitals: { hp: num(data.hp), mana: num(data.mana), moves: num(data.moves) } } });
@@ -981,6 +1002,50 @@ export class Game {
     }
 
     if (!this.state.loggedIn && p.startsWith('char.')) this.onLogin();
+  }
+
+  /**
+   * Iron Realms GMCP, mapped onto the same state Aardwolf fills:
+   * Char.Vitals {hp, maxhp, mp, maxmp, ep, maxep, wp, maxwp, nl}, Char.Name {name, fullname},
+   * Char.Status {level: "12 (34%)", class, race…}, Room.Info {num, name, area, environment, exits, details[]},
+   * Comm.Channel.Text {channel, talker, text}.
+   */
+  private onIreGmcp(p: string, data: any) {
+    const char = this.state.char;
+    if (p === 'char.vitals') {
+      this.set({ char: { ...char,
+        vitals: { hp: num(data.hp), mana: num(data.mp), moves: num(data.ep) },
+        maxstats: { ...char.maxstats, maxhp: num(data.maxhp), maxmana: num(data.maxmp), maxmoves: num(data.maxep) },
+        ire: { ...char.ire, vitals: data },
+      } });
+    } else if (p === 'char.name') {
+      this.set({ char: { ...char, base: { ...char.base, name: String(data.name ?? ''), fullname: String(data.fullname ?? '') } } });
+    } else if (p === 'char.status') {
+      // Status updates are partial: merge. Level arrives as "12 (34%)".
+      const ire = { ...char.ire, status: { ...char.ire?.status, ...data } };
+      const st = ire.status;
+      this.set({ char: { ...char, ire,
+        base: { ...char.base, name: st.name ?? char.base?.name, class: st.class, race: st.race, fullname: st.fullname ?? char.base?.fullname },
+        worth: st.gold !== undefined ? { ...char.worth, gold: num(st.gold), bank: num(st.bank) } : char.worth,
+      } });
+    } else if (p === 'room.info') {
+      const room: RoomInfo = {
+        num: num(data.num), name: String(data.name ?? ''), zone: String(data.area ?? ''),
+        terrain: String(data.environment ?? '').toLowerCase(),
+        details: Array.isArray(data.details) ? data.details.join(',') : String(data.details ?? ''),
+        exits: mapNums(data.exits ?? {}),
+      };
+      if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
+      this.mapper.add(room);
+      this.set({ room, mapVersion: this.state.mapVersion + 1 });
+    } else if (p === 'comm.channel.text') {
+      const raw = String(data.text ?? '');
+      const msg: ChatMsg = { id: nextId++, chan: String(data.channel ?? ''), player: String(data.talker ?? ''), msg: new AnsiParser().parse(raw), at: Date.now() };
+      if (!plain(msg.msg).trim()) return;
+      const chat = this.state.chat.concat(msg).slice(-CHAT_MAX);
+      this.set({ chat });
+      saveChat(chat);
+    }
   }
 
   dismissDeath() { this.set({ death: null }); }
@@ -1109,6 +1174,11 @@ export class Game {
 
   private setupAfterLogin() {
     this.setupPending = false;
+    if (this.ire) {
+      this.gmcp('Char.Items.Inv');
+      this.gmcp('Comm.Channel.Players');
+      return;
+    }
     this.gmcp('request char');
     this.gmcp('request room');
     // Ask which tags exist, then enable the room-related ones we know how to parse.

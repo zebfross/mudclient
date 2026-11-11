@@ -20,7 +20,7 @@ export function startConnection() {
     let msg: any;
     try { msg = JSON.parse(e.data); } catch { return; }
     if (msg.t === 'session') {
-      game.onSession(!!msg.resumed);
+      game.onSession(!!msg.resumed, msg.game, msg.family);
       return;
     }
     try { game.onMessage(msg); } catch (err) { console.error(err); }

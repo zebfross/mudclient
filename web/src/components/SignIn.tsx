@@ -102,7 +102,7 @@ export function SignIn() {
       <form ref={form} className="flex flex-col gap-3" onSubmit={submit} autoComplete="on">
         <div className="flex items-center gap-2">
           <Icon name="key" className="text-primary text-xl" />
-          <h2 className="font-display text-base text-primary flex-1">Log in to Aardwolf</h2>
+          <h2 className="font-display text-base text-primary flex-1">Log in to {game.gameName}</h2>
           {!connected && !busy && <span className="font-mono text-[10px] text-outline">Not connected: logging in connects you</span>}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -147,7 +147,7 @@ export function SignIn() {
         <p className="text-[10px] text-outline">
           {auto
             ? 'With “remember me” on, your name and password are saved in this browser (plain text in your browser profile), so only use it on your own computer.'
-            : 'Your password goes only to Aardwolf. Gaslamp doesn’t keep it.'}
+            : `Your password goes only to ${game.gameName}. Gaslamp doesn’t keep it.`}
         </p>
       </form>
     </section>
