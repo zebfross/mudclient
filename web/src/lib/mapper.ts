@@ -31,8 +31,14 @@ export type AreaNode = {
   seen?: SeenCell; // set for rooms only known from Aardwolf's map
   border?: string; // a visited room in another area, next to this one: its zone
 };
-export const DIRS: Record<string, [number, number]> = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0] };
-export const DIR_NAMES: Record<string, string> = { n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down' };
+// Diagonals only occur in Iron Realms games; Aardwolf never has them.
+export const DIRS: Record<string, [number, number]> = {
+  n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [1, -1], nw: [-1, -1], se: [1, 1], sw: [-1, 1],
+};
+export const DIR_NAMES: Record<string, string> = {
+  n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down',
+  ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest', in: 'in', out: 'out',
+};
 
 export class Mapper {
   rooms = new Map<number, RoomInfo>();

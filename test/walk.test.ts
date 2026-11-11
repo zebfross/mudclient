@@ -32,15 +32,17 @@ function setup() {
   assert.equal(sent.length, 5, 'done');
 }
 
-// A locked door stops the walk; nothing more is sent.
+// A locked door: the key is tried once (unlock, open, move); if that fails too, the walk stops.
 {
   const { g, sent, room, say } = setup();
   g.walk(['n', 'n']);
-  say('The iron gate is closed.\r\n> '); await tick();
+  say('The iron gate is closed.\r\n[100hp] > '); await tick(250);
   assert.deepEqual(sent, ['north', 'open north', 'north']);
-  say("It's locked.\r\nThe iron gate is closed.\r\n> "); await tick();
+  say("It's locked.\r\n[100hp] > "); await tick(250);
+  assert.deepEqual(sent.slice(3), ['unlock north', 'open north', 'north']);
+  say("It's locked.\r\nThe iron gate is closed.\r\n[100hp] > "); await tick(250);
   room(9); await tick();
-  assert.deepEqual(sent, ['north', 'open north', 'north']);
+  assert.equal(sent.length, 6, 'stopped: nothing more sent');
 }
 
 // A single typed or clicked step also opens the door, once.
@@ -56,7 +58,7 @@ function setup() {
   assert.equal(sent.length, 4, 'looking at a door does not open it');
 }
 
-// A locked door with no key: one try, then nothing more, even as the game keeps answering.
+// A locked door with no key: one open, one key try, then nothing more, even as the game keeps answering.
 {
   const { g, sent, say } = setup();
   g.command('west');
@@ -64,7 +66,24 @@ function setup() {
     say('The door is closed.\r\n[100hp] > '); await tick(250);
     say("It's locked.\r\n[100hp] > "); await tick(250);
   }
-  assert.deepEqual(sent, ['west', 'open west', 'west']);
+  assert.deepEqual(sent, ['west', 'open west', 'west', 'unlock west', 'open west', 'west']);
+}
+
+// Iron Realms: diagonal steps, and doors are named: "open door nw", "unlock door nw".
+{
+  const { g, sent, say } = setup();
+  g.onSession(true, 'achaea', 'ire');
+  sent.length = 0;
+  g.command('nw');
+  say('There is a door in the way.\r\n350h, 385m ex-\r\n'); await tick();
+  assert.deepEqual(sent, ['nw', 'open door nw', 'northwest']);
+  say('The door is locked.\r\n350h, 385m ex-\r\n'); await tick();
+  assert.deepEqual(sent.slice(3), ['unlock door nw', 'open door nw', 'northwest']);
+  say('There is a door in the way.\r\n350h, 385m ex-\r\n'); await tick();
+  assert.equal(sent.length, 6, 'one try each');
+  sent.length = 0;
+  g.walk(['ne', 'sw']);
+  assert.deepEqual(sent, ['northeast']);
 }
 
 console.log('walk tests passed');

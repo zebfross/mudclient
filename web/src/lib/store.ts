@@ -26,12 +26,20 @@ export interface NoteDraft { to: string; subject: string; body: string }
 const NOTE_REFUSED_RE = /not found|no such|no one|nobody|invalid|cannot|can't|unable|not allowed|you must|huh\?/i;
 const DIR_FULL: Record<string, string> = {
   n: 'north', s: 'south', e: 'east', w: 'west', u: 'up', d: 'down',
+  ne: 'northeast', nw: 'northwest', se: 'southeast', sw: 'southwest', in: 'in', out: 'out',
   north: 'north', south: 'south', east: 'east', west: 'west', up: 'up', down: 'down',
+  northeast: 'northeast', northwest: 'northwest', southeast: 'southeast', southwest: 'southwest',
 };
-// "The door is closed." / "The iron gate is closed."
-const DOOR_CLOSED_RE = /^\s*The [\w' -]+ is closed\.\s*$/i;
+const DIR_SHORT: Record<string, string> = {
+  north: 'n', south: 's', east: 'e', west: 'w', up: 'u', down: 'd',
+  northeast: 'ne', northwest: 'nw', southeast: 'se', southwest: 'sw', in: 'in', out: 'out',
+};
+// Aardwolf: "The door is closed." / "The iron gate is closed." Iron Realms: "There is a door in the way."
+const DOOR_CLOSED_RE = /^\s*(?:The [\w' -]+ is closed\.|There is a (?:closed )?[\w' -]+ in the way\.?)\s*$/i;
+// "It's locked." / "The door is locked." (stop, unless we can try the key once)
+const DOOR_LOCKED_RE = /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i;
 // Reasons a walk can't go on: stop, rather than send the rest of the route from the wrong room.
-const WALK_BLOCKED_RE = /^\s*(?:it'?s locked|the [\w' -]+ is locked|alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i;
+const WALK_BLOCKED_RE = /^\s*(?:alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i;
 // "Stitch tells you 'I would pay around 15 gold coins for a long sword.'" / "Stitch is not interested in a pink flamingo."
 // Narrow on purpose: a player's tell arriving meanwhile must not be taken (and hidden) as the answer.
 const VALUE_REPLY_RE = /tells you '(?:I would pay|Alas, I cannot afford)|is not interested in|is far too valuable to sell|cannot be sold|can'?t be sold|you don'?t (?:have|seem to have)|you do not have|there is no shopkeeper|no shopkeeper here|won'?t buy|doesn'?t buy/i;
@@ -297,7 +305,7 @@ export class Game {
     if (this.state.loggedIn && INV_VERBS.test(cmd.trim())) this.refreshInventory(800);
     const dir = DIR_FULL[cmd.trim().toLowerCase()];
     if (dir && !this.walker) this.lastMove = { dir, at: Date.now(), opened: false };
-    else if (!dir && !/^open\b/i.test(cmd.trim())) this.lastMove = null;
+    else if (!dir && !/^(?:open|unlock)\b/i.test(cmd.trim())) this.lastMove = null;
   }
 
   /** Several commands, e.g. a speedwalk. */
@@ -317,16 +325,16 @@ export class Game {
   }
   stopWalk() { if (this.walker) clearTimeout(this.walker.timer); this.walker = null; }
 
-  private walker: { steps: string[]; i: number; from?: number; opened: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
+  private walker: { steps: string[]; i: number; from?: number; opened: boolean; unlocked?: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
   /** The last single step typed or clicked, for opening a door it bumps into. */
-  private lastMove: { dir: string; at: number; opened: boolean } | null = null;
+  private lastMove: { dir: string; at: number; opened: boolean; unlocked?: boolean } | null = null;
 
   private walkStep() {
     const w = this.walker;
     if (!w) return;
     if (w.i >= w.steps.length) return this.stopWalk();
     w.from = this.state.room?.num;
-    w.opened = false;
+    w.opened = false; w.unlocked = false;
     this.command(w.steps[w.i]);
     this.walkTimeout();
   }
@@ -338,22 +346,33 @@ export class Game {
   }
 
   /** A door was in the way: open it and try the same step once more. */
-  private onDoorClosed() {
+  /** "open north" on Aardwolf; "open door n" on Iron Realms games, which name the door. */
+  private doorCmd(verb: 'open' | 'unlock', dir: string) {
+    return this.ire ? `${verb} door ${DIR_SHORT[dir] ?? dir}` : `${verb} ${dir}`;
+  }
+
+  /** A door in the way of a move: open it and try once more. */
+  private onDoorClosed() { this.retryDoor(false); }
+
+  /** A locked door: try the key once (unlock, open, move); after that, give up. */
+  private onDoorLocked() { this.retryDoor(true); }
+
+  private retryDoor(locked: boolean) {
     const w = this.walker;
-    if (w) {
-      if (w.opened) return this.stopWalk();
-      w.opened = true;
-      this.command(`open ${w.steps[w.i]}`);
-      this.command(w.steps[w.i]);
-      this.walkTimeout();
+    const m = w ? { dir: w.steps[w.i], opened: !!w.opened, unlocked: !!w.unlocked } : this.lastMove;
+    if (!m || (!w && Date.now() - this.lastMove!.at > 4000)) return;
+    if (locked ? m.unlocked : m.opened) {
+      if (w) this.stopWalk();
+      else this.lastMove = null; // tried already: no loop
       return;
     }
-    const m = this.lastMove;
-    if (!m || m.opened || Date.now() - m.at > 4000) return;
-    this.command(`open ${m.dir}`);
+    if (locked) this.command(this.doorCmd('unlock', m.dir));
+    this.command(this.doorCmd('open', m.dir));
     this.command(m.dir);
-    // The retry is itself a move: mark it tried, or the next "is closed" would start this again.
-    this.lastMove = { dir: m.dir, at: Date.now(), opened: true };
+    // The retry is itself a move: mark what we tried, or the same reply would start this again.
+    const tried = { opened: true, unlocked: m.unlocked || locked };
+    if (w) { Object.assign(w, tried); this.walkTimeout(); }
+    else this.lastMove = { dir: m.dir, at: Date.now(), ...tried };
   }
 
   /** Send a command whose next prompt should not be shown. */
@@ -896,7 +915,7 @@ export class Game {
     if (this.mapBlock) this.mapBlock.push(segs);
     if (DEATH_RE.test(text)) this.set({ death: { at: Date.now() } });
     if (DOOR_CLOSED_RE.test(text)) this.onDoorClosed();
-    else if (this.lastMove && /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i.test(text)) this.lastMove.opened = true; // no key: don't retry
+    else if (DOOR_LOCKED_RE.test(text)) this.onDoorLocked();
     else if (this.walker && WALK_BLOCKED_RE.test(text)) this.stopWalk();
     this.noteTime(text);
     if (NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }

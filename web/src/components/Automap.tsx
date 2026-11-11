@@ -76,7 +76,8 @@ export function Automap() {
 }
 
 function MapFrame({ mode }: { mode: Mode }) {
-  const { room, mapVersion, asciiMap, loggedIn } = useGame();
+  const { room, mapVersion, asciiMap, loggedIn, mud } = useGame();
+  const ire = mud.family === 'ire';
   const hasGrid = useMemo(() => !!parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
   const map = game.mapper;
   const layout = useMemo(() => (room ? map.layout(room.num, R) : null), [room?.num, mapVersion]);
@@ -91,9 +92,10 @@ function MapFrame({ mode }: { mode: Mode }) {
 
   return (
       <div className="rounded-lg border border-surface-high/40 bg-surface-lowest/80 shadow-inner p-1.5 grid grid-cols-[auto_minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto] items-center justify-items-center gap-1">
-        <span />
-        <DirButton dir="n" />
-        <DirButton dir="u" />
+        {/* Iron Realms has diagonals: they take the corners, and up/down sit beside north/south. */}
+        {ire ? <DirButton dir="nw" /> : <span />}
+        {ire ? <span className="flex gap-1"><DirButton dir="n" /><DirButton dir="u" /></span> : <DirButton dir="n" />}
+        {ire ? <DirButton dir="ne" /> : <DirButton dir="u" />}
         <DirButton dir="w" />
         <div className="w-full min-w-0 flex justify-center items-center overflow-auto scroll-thin py-1">
           {mode === 'aard' ? (
@@ -151,9 +153,9 @@ function MapFrame({ mode }: { mode: Mode }) {
           )}
         </div>
         <DirButton dir="e" />
-        <Coords />
-        <DirButton dir="s" />
-        <DirButton dir="d" />
+        {ire ? <DirButton dir="sw" /> : <Coords />}
+        {ire ? <span className="flex gap-1"><DirButton dir="s" /><DirButton dir="d" /></span> : <DirButton dir="s" />}
+        {ire ? <DirButton dir="se" /> : <DirButton dir="d" />}
       </div>
   );
 }
@@ -175,7 +177,7 @@ export function Coords({ className = '' }: { className?: string }) {
 const DIR_ICON: Record<string, string> = { u: 'arrow_upward', d: 'arrow_downward' };
 
 /** One exit button on the map's edge: N/S show where they lead; E/W/U/D are compact. */
-function DirButton({ dir }: { dir: 'n' | 's' | 'e' | 'w' | 'u' | 'd' }) {
+function DirButton({ dir }: { dir: 'n' | 's' | 'e' | 'w' | 'u' | 'd' | 'ne' | 'nw' | 'se' | 'sw' }) {
   const { room } = useGame();
   const exits = room?.exits ?? {};
   const open = dir in exits;
@@ -184,7 +186,7 @@ function DirButton({ dir }: { dir: 'n' | 's' | 'e' | 'w' | 'u' | 'd' }) {
   return (
     <button
       disabled={!open}
-      onClick={() => game.command(DIR_NAMES[dir])}
+      onClick={() => game.walk([dir])}
       title={open ? `${DIR_NAMES[dir]}: ${dest}` : `No exit ${DIR_NAMES[dir]}`}
       aria-label={open ? `Go ${DIR_NAMES[dir]} to ${dest}` : `No exit ${DIR_NAMES[dir]}`}
       className={`flex items-center gap-1.5 rounded-full font-mono text-[11px] font-bold transition-colors shadow ${
