@@ -14,7 +14,7 @@ const CONTENT_ICON: Record<string, [string, string]> = {
   ...Object.fromEntries(Object.entries(CONTENT_STYLE).map(([c, v]) => [c, [v.icon, v.color] as [string, string]])),
 };
 
-/** Aardwolf's map, parsed into walkable tiles; known rooms are named, the rest are ghosts. */
+/** The game's own map (Aardwolf or Iron Realms), parsed into walkable tiles; known rooms are named, the rest are ghosts. */
 export function GridMap() {
   const { asciiMap, room, mapVersion } = useGame();
   const grid = useMemo(() => parseAsciiMap(asciiMap.map(plain)), [asciiMap]);
@@ -35,8 +35,8 @@ export function GridMap() {
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width={w} style={{ maxWidth: '100%', maxHeight: 340 }} role="img" aria-label="Map of nearby rooms">
-      {grid.cells.flatMap((c) => (['e', 's'] as const).filter((d) => c.exits[d]).map((d) => {
-        const nx = c.x + (d === 'e' ? 1 : 0), ny = c.y + (d === 's' ? 1 : 0);
+      {grid.cells.flatMap((c) => (['e', 's', 'se', 'sw'] as const).filter((d) => c.exits[d]).map((d) => {
+        const nx = c.x + (d === 's' ? 0 : d === 'sw' ? -1 : 1), ny = c.y + (d === 'e' ? 0 : 1);
         return <line key={`${c.x},${c.y},${d}`} x1={cx(c)} y1={cy(c)} x2={cx({ x: nx })} y2={cy({ y: ny })} stroke="#6d5a4c" strokeWidth={2.5} strokeLinecap="round" />;
       }))}
       {grid.cells.map((c) => {

@@ -33,7 +33,7 @@ export function Automap() {
 
   const controls = (
           <div className="flex items-center gap-1" role="group" aria-label="Map view">
-            {([['aard', 'grid_on', "Aardwolf's map"], ['charted', 'hub', `Charted by you (${map.size} ${map.size === 1 ? 'room' : 'rooms'}), click to walk`]] as const).map(([m, icon, label]) => (
+            {([['aard', 'grid_on', `${game.gameName}'s map`], ['charted', 'hub', `Charted by you (${map.size} ${map.size === 1 ? 'room' : 'rooms'}), click to walk`]] as const).map(([m, icon, label]) => (
               <button key={m} onClick={() => choose(m)} title={label} aria-label={label} aria-pressed={mode === m}
                 className={`p-1 rounded border ${mode === m ? 'bg-primary/20 text-primary border-primary/40' : 'text-outline border-surface-high/40 hover:text-on-surface'}`}>
                 <Icon name={icon} className="text-base" />
@@ -98,7 +98,7 @@ function MapFrame({ mode }: { mode: Mode }) {
         <div className="w-full min-w-0 flex justify-center items-center overflow-auto scroll-thin py-1">
           {mode === 'aard' ? (
             asciiMap.length === 0 ? (
-              <Empty>{loggedIn ? 'Drawing the map…' : "Aardwolf's map of your surroundings appears here."}</Empty>
+              <Empty>{loggedIn ? 'Drawing the map…' : `${game.gameName}'s map of your surroundings appears here.`}</Empty>
             ) : (
               <pre className="font-mono text-[12px] leading-[1.2] text-[#cfc6bd] select-text">
                 {asciiMap.map((l, i) => <div key={i} className="min-h-[1lh]"><SegText segs={l} /></div>)}

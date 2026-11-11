@@ -84,6 +84,8 @@ const emptyNotes = (): NotesState => ({ boards: [], forum: 'Personal', posts: []
 export interface LoginState { stage: 'idle' | 'waiting' | 'name' | 'password' | 'error'; error?: string; retry?: boolean }
 // Aardwolf's wording isn't documented here, so these are deliberately broad.
 // The question itself, not the banner line above it ("Enter your character name or type 'NEW'…").
+const IRE_MAP_START = /^\s*--- Area \d+: .* ---\s*$/;
+const IRE_MAP_END = /^\s*--- .* -?\d+:-?\d+:-?\d+ ---\s*$/;
 const NAME_PROMPT_RE = /(?:what be thy name|what is your name|by what name)[^?]*\?\s*$|^\s*name\s*:\s*$|enter your character'?s name\.?\s*$/i;
 const WRONG_PASSWORD_RE = /wrong password|incorrect password|password (?:is )?incorrect|invalid password/i;
 // Only checked after the name was sent: the login banner itself mentions creating a new character.
@@ -269,8 +271,8 @@ export class Game {
     // If you're in the game, the character data that comes back logs us in and we look around.
     // (At Aardwolf's login screen a 'look' would be taken as a character name.)
     this.lookAfterLogin = true;
-    // Iron Realms games send Char.Vitals with every prompt, so the next one logs us in by itself.
-    if (this.ire) return;
+    // Iron Realms: asking for the inventory only gets an answer in the game, so the reply logs us in.
+    if (this.ire) { this.gmcp('Char.Items.Inv'); return; }
     this.gmcp('request char');
     this.gmcp('request room');
   }
@@ -395,7 +397,7 @@ export class Game {
   }
 
   private captureReply(cmd: string, start: RegExp, cb: CaptureCb, end?: RegExp) {
-    if (this.gameDown || this.ire) return; // Aardwolf commands and replies only, for now // nothing to ask; it would be sent to whatever connects next
+    if (this.gameDown || (this.ire && cmd !== 'map')) return; // on IRE games, only the map so far // nothing to ask; it would be sent to whatever connects next
     this.captureQueue.push({ cmd, start, end, cb });
     if (!this.capture) this.nextCapture();
   }
@@ -432,6 +434,14 @@ export class Game {
   /** Quietly redraw Aardwolf's own map for the sidebar (debounced, so a speedwalk draws once). */
   refreshMap(delay = 300) {
     clearTimeout(this.mapTimer);
+    if (this.ire) {
+      // Achaea: "--- Area N: Name - vNUM ---", the grid, then "--- Room name ---- x:y:z ---".
+      this.mapTimer = setTimeout(() => {
+        if (!this.state.loggedIn || this.captureQueue.some((q) => q.cmd === 'map')) return;
+        this.captureReply('map', IRE_MAP_START, (_text, segs) => this.set({ asciiMap: trimBlankLines(segs) }), IRE_MAP_END);
+      }, delay);
+      return;
+    }
     this.mapTimer = setTimeout(() => {
       if (!this.state.loggedIn || !this.mapTagOn || this.captureQueue.some((q) => q.cmd === 'map')) return;
       this.captureReply('map', /^\s*<MAPSTART>/, (_text, segs) => {
@@ -962,7 +972,7 @@ export class Game {
     const char = this.state.char;
     if (this.ire) {
       this.onIreGmcp(p, data ?? {});
-      if (!this.state.loggedIn && (p.startsWith('char.vitals') || p === 'char.name' || p === 'char.status')) this.onLogin();
+      if (!this.state.loggedIn && (p === 'char.vitals' || p === 'char.name' || p === 'char.status' || p.startsWith('char.items.'))) this.onLogin();
       return;
     }
     if (p === 'comm.tick') return this.tick();
@@ -1036,6 +1046,7 @@ export class Game {
         exits: mapNums(data.exits ?? {}),
       };
       if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
+      if (room.num !== this.state.room?.num) this.refreshMap();
       this.mapper.add(room);
       this.set({ room, mapVersion: this.state.mapVersion + 1 });
     } else if (p === 'comm.channel.text') {
@@ -1177,6 +1188,7 @@ export class Game {
     if (this.ire) {
       this.gmcp('Char.Items.Inv');
       this.gmcp('Comm.Channel.Players');
+      this.refreshMap(800);
       return;
     }
     this.gmcp('request char');
