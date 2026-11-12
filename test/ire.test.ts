@@ -3,6 +3,7 @@ import { Game } from '../web/src/lib/store.ts';
 import { plain } from '../web/src/lib/ansi.ts';
 import { adapterFor } from '../web/src/lib/games/index.ts';
 import { gridPath, key, parseAsciiMap } from '../web/src/lib/asciiMap.ts';
+import { roomMark } from '../web/src/lib/mapStyle.ts';
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 function setup() {
@@ -187,6 +188,15 @@ function setup() {
   await login();
   assert.deepEqual(cmds, ['Finch', 'fake-test-pass', 'Finch', 'fake-test-pass'], 'second login answered too');
   assert.ok(g.state.loggedIn);
+}
+
+// Shops come from Room.Info details: Achaea's ASCII map doesn't mark them.
+{
+  assert.equal(roomMark({ details: 'shop,indoors' }), '$');
+  assert.equal(roomMark({ details: 'bank' }), '&');
+  assert.equal(roomMark({ details: 'indoors' }), undefined);
+  assert.equal(roomMark({ details: '' }), undefined);
+  assert.equal(roomMark({ mark: '?', details: 'shop' }), '?'); // Aardwolf's own map mark wins
 }
 
 console.log('ire tests passed');

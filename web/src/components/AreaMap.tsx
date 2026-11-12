@@ -4,7 +4,7 @@ import { DIRS, DIR_NAMES, drawnPath } from '../lib/mapper.ts';
 import { Icon, terrainIcon } from './ui.tsx';
 import { plain } from '../lib/ansi.ts';
 import { labelGrid, parseAsciiMap } from '../lib/asciiMap.ts';
-import { BRACKET_TERRAIN, CONTENT_STYLE } from '../lib/mapStyle.ts';
+import { BRACKET_TERRAIN, CONTENT_STYLE, roomMark } from '../lib/mapStyle.ts';
 
 const CELL = 64; // world units between room centres
 const TILE = 36;
@@ -45,6 +45,11 @@ export function AreaMap() {
   const nodes = layout?.nodes ?? [];
   const pos = useMemo(() => new Map(nodes.map((n) => [n.num, n])), [layout]);
   const visited = nodes.filter((n) => !n.ghost && !n.border).length;
+  // The key lists the everyday symbols, plus any rarer one (bank, post office…) that's on this map.
+  const legend = useMemo(() => {
+    const present = new Set(nodes.map((n) => roomMark(map.rooms.get(n.num)) ?? n.seen?.mark));
+    return Object.entries(CONTENT_STYLE).filter(([c]) => '$!*'.includes(c) || present.has(c)).map(([, v]) => v);
+  }, [layout]);
 
   // `view.x/y` is where *you* sit on screen (the layout is built around your room at 0,0).
   const centreOn = (k: number) => setView({ k, x: size.w / 2, y: size.h / 2 });
@@ -123,7 +128,7 @@ export function AreaMap() {
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-primary" /> you</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm border border-dashed border-[#6d5a4c]" /> not visited</span>
         <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm border border-dashed border-secondary" /> another area</span>
-        {Object.values(CONTENT_STYLE).map((c) => (
+        {legend.map((c) => (
           <span key={c.icon} className="flex items-center gap-0.5"><Icon name={c.icon} className="text-sm" style={{ color: c.color }} />{c.label.replace(' here', '')}</span>
         ))}
         <span className="ml-auto flex items-center gap-1">
@@ -178,7 +183,7 @@ export function AreaMap() {
                 const r = map.rooms.get(n.num);
                 const here = n.num === room.num;
                 const vertical = r ? ['u', 'd'].filter((d) => d in r.exits).join('') : n.seen?.ud ?? '';
-                const what = CONTENT_STYLE[live.get(n.num) ?? ''] ?? CONTENT_STYLE[r?.mark ?? n.seen?.mark ?? ''];
+                const what = CONTENT_STYLE[live.get(n.num) ?? ''] ?? CONTENT_STYLE[roomMark(r) ?? n.seen?.mark ?? ''];
                 const terrain = r?.terrain ?? BRACKET_TERRAIN[n.seen?.terrain ?? ''];
                 const name = r?.name ?? (n.seen && n.from === undefined ? 'Seen on the map, not visited' : `Unexplored (${DIR_NAMES[n.dir ?? ''] ?? '?'} of ${map.rooms.get(n.from ?? -1)?.name ?? '?'})`);
                 return (

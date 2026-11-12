@@ -4,7 +4,7 @@ import { plain } from '../lib/ansi.ts';
 import { DIR_NAMES } from '../lib/mapper.ts';
 import { gridPath, key, labelGrid, parseAsciiMap, type GridCell } from '../lib/asciiMap.ts';
 import { terrainIcon } from './ui.tsx';
-import { BRACKET_TERRAIN, CONTENT_STYLE } from '../lib/mapStyle.ts';
+import { BRACKET_TERRAIN, CONTENT_STYLE, roomMark } from '../lib/mapStyle.ts';
 
 const CELL = 40;
 const TILE = 30;
@@ -43,9 +43,11 @@ export function GridMap() {
         const here = c.x === 0 && c.y === 0;
         const id = ids.get(key(c.x, c.y));
         const known = id !== undefined ? game.mapper.rooms.get(id) ?? (here ? room : undefined) : undefined;
-        const [icon, color] = CONTENT_ICON[c.contents] ?? [terrainIcon(known?.terrain ?? BRACKET_TERRAIN[c.terrain] ?? ''), known ? '#cfc6bd' : '#a38c7c'];
+        // What the map shows right now wins (you, a mob); otherwise what we know of the room.
+        const shown = CONTENT_ICON[c.contents] ? c.contents : roomMark(known) ?? '';
+        const [icon, color] = CONTENT_ICON[shown] ?? [terrainIcon(known?.terrain ?? BRACKET_TERRAIN[c.terrain] ?? ''), known ? '#cfc6bd' : '#a38c7c'];
         const name = known?.name ?? (id !== undefined ? `Room #${id} (not visited)` : 'Unexplored room');
-        const what = CONTENT_STYLE[c.contents] ? ` · ${CONTENT_STYLE[c.contents].label}` : '';
+        const what = CONTENT_STYLE[shown] ? ` · ${CONTENT_STYLE[shown].label}` : '';
         return (
           <g key={key(c.x, c.y)} transform={`translate(${cx(c) - TILE / 2},${cy(c) - TILE / 2})`} onClick={() => walk(c)}
             className={here ? '' : 'cursor-pointer [&:hover>rect]:stroke-[#ffb77d]'}>
