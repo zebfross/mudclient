@@ -76,4 +76,5 @@ export const aardwolf: GameAdapter = {
   doorLocked: /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i,
   // Reasons a walk can't go on: stop, rather than send the rest of the route from the wrong room.
   walkBlocked: /^\s*(?:alas, you cannot go that way|you can'?t go that way|you are too exhausted|you'?re too exhausted|you are fighting|no way!? you are still fighting|you can'?t (?:do that|move)|you are (?:sleeping|resting|sitting)|nah\.\.\.|you'?re stuck)/i,
+  stepGap: 0,
 };

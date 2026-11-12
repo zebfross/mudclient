@@ -75,4 +75,8 @@ export interface GameAdapter {
   doorClosed: RegExp;
   doorLocked: RegExp;
   walkBlocked: RegExp;
+  /** Least time between two steps of a walk, in ms: some games refuse moves sent too quickly. */
+  stepGap: number;
+  /** "You moved too fast": the step was ignored, so send it again after a pause. */
+  walkTooFast?: RegExp;
 }

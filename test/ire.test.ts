@@ -190,6 +190,31 @@ function setup() {
   assert.ok(g.state.loggedIn);
 }
 
+// Walking: steps are spaced out, and a step Achaea calls "hasty" is sent again.
+{
+  const g = new Game();
+  const sent: string[] = [];
+  g.attach((m: any) => { if (m.t === 'cmd') sent.push(m.d); });
+  g.onSession(false, 'achaea', 'ire');
+  g.onMessage({ t: 'status', connected: true });
+  (g as any).hidden = () => {}; (g as any).refreshMap = () => {};
+  const room = (num: number) => g.onMessage({ t: 'gmcp', pkg: 'Room.Info', data: { num, name: `R${num}`, area: 'a', exits: {} } });
+  room(1);
+  g.walk(['n', 'nw', 'w']);
+  assert.deepEqual(sent, ['north']);
+  room(2); await tick(50);
+  assert.deepEqual(sent, ['north'], 'the next step waits out the gap');
+  await tick(650);
+  assert.deepEqual(sent, ['north', 'northwest']);
+  g.onMessage({ t: 'text', d: "Now now, don't be so hasty!\r\n100h, 100m, 100e, 100w ex-\r\n" }); await tick(300);
+  assert.equal(sent.length, 2, 'not resent at once');
+  await tick(900);
+  assert.deepEqual(sent, ['north', 'northwest', 'northwest'], 'the dropped step is sent again');
+  room(3); await tick(700);
+  assert.deepEqual(sent.slice(3), ['west']);
+  g.stopWalk();
+}
+
 // Shops come from Room.Info details: Achaea's ASCII map doesn't mark them.
 {
   assert.equal(roomMark({ details: 'shop,indoors' }), '$');

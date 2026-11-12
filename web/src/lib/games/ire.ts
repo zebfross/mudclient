@@ -93,4 +93,7 @@ export const ire: GameAdapter = {
   doorClosed: /^\s*There is a (?:closed )?[\w' -]+ in the way\.?\s*$/i,
   doorLocked: /^\s*(?:it'?s locked|the [\w' -]+ is locked)/i,
   walkBlocked: /^\s*(?:there is no exit in that direction|you can'?t go that way|you cannot (?:go|move) that way|you are (?:asleep|sleeping|sitting|prone|stunned|paralysed|bound|entangled)|you must (?:stand|be standing))/i,
+  // Moving again straight after arriving gets "Now now, don't be so hasty!" and the move is dropped.
+  stepGap: 600,
+  walkTooFast: /^\s*Now now, don'?t be so hasty!?\s*$/i,
 };

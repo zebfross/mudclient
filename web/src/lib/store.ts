@@ -316,7 +316,7 @@ export class Game implements Host {
   }
   stopWalk() { if (this.walker) clearTimeout(this.walker.timer); this.walker = null; }
 
-  private walker: { steps: string[]; i: number; from?: number; opened: boolean; unlocked?: boolean; timer?: ReturnType<typeof setTimeout> } | null = null;
+  private walker: { steps: string[]; i: number; from?: number; opened: boolean; unlocked?: boolean; timer?: ReturnType<typeof setTimeout>; sentAt?: number; retries?: number } | null = null;
   /** The last single step typed or clicked, for opening a door it bumps into. */
   private lastMove: { dir: string; at: number; opened: boolean; unlocked?: boolean } | null = null;
 
@@ -324,10 +324,27 @@ export class Game implements Host {
     const w = this.walker;
     if (!w) return;
     if (w.i >= w.steps.length) return this.stopWalk();
+    // Too soon after the last step for this game: wait out the gap first.
+    const wait = (w.sentAt ?? 0) + this.adapter.stepGap - Date.now();
+    if (wait > 0) {
+      clearTimeout(w.timer);
+      w.timer = setTimeout(() => { if (this.walker === w) this.walkStep(); }, wait);
+      return;
+    }
     w.from = this.state.room?.num;
     w.opened = false; w.unlocked = false;
+    w.sentAt = Date.now();
     this.command(w.steps[w.i]);
     this.walkTimeout();
+  }
+  /** The game dropped the step for coming too fast: send it again after a longer pause, a few times. */
+  private walkTooFast() {
+    const w = this.walker;
+    if (!w) return;
+    w.retries = (w.retries ?? 0) + 1;
+    if (w.retries > 3) return this.stopWalk();
+    clearTimeout(w.timer);
+    w.timer = setTimeout(() => { if (this.walker === w) { w.sentAt = 0; this.walkStep(); } }, Math.max(1000, this.adapter.stepGap * 2));
   }
   private walkTimeout() {
     const w = this.walker;
@@ -896,6 +913,7 @@ export class Game implements Host {
     const a = this.adapter;
     if (a.doorClosed.test(text)) this.onDoorClosed();
     else if (a.doorLocked.test(text)) this.onDoorLocked();
+    else if (this.walker && a.walkTooFast?.test(text)) this.walkTooFast();
     else if (this.walker && a.walkBlocked.test(text)) this.stopWalk();
     if (a.features.gameClock) this.noteTime(text);
     if (a.features.notes && NEW_NOTE_RE.test(text)) { clearTimeout(this.notesTimer); this.notesTimer = setTimeout(() => this.refreshNotes(), 1500); }
@@ -974,7 +992,7 @@ export class Game implements Host {
 
   /** A room report from any game: walking, the map, and per-room features. */
   enterRoom(room: RoomInfo) {
-    if (this.walker && room.num !== this.walker.from) { this.walker.i++; queueMicrotask(() => this.walkStep()); }
+    if (this.walker && room.num !== this.walker.from) { this.walker.i++; this.walker.retries = 0; queueMicrotask(() => this.walkStep()); }
     if (room.num !== this.state.room?.num) {
       this.refreshMap();
       clearTimeout(this.shopTimer);
