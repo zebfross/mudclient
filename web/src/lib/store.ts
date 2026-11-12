@@ -288,6 +288,7 @@ export class Game implements Host {
       // Commit the pending prompt with the command on the same line, as a terminal would.
       this.print({ segs: [...this.cur, { text: ' ' + shown, fg: '#ffb77d' }] });
       this.cur = [];
+      this.loginPartialSeen = ''; // that prompt is answered and gone; it won't come back as a line
     } else {
       this.print({ segs: [{ text: shown }], kind: 'echo' });
     }
@@ -785,6 +786,8 @@ export class Game implements Host {
         this.connecting = attempt;
         this.gameDown = !msg.connected;
         this.set({ connected: msg.connected, status: msg.msg ?? (msg.connected ? 'Connected' : 'Disconnected') });
+        // A new connection asks the same name question word for word: it must not look already answered.
+        this.loginPartialSeen = '';
         if (msg.msg) this.sys(`— ${msg.msg}`);
         if (!msg.connected) {
           this.set({ loggedIn: false, localEcho: true, noteEditor: false });

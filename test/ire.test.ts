@@ -159,4 +159,35 @@ function setup() {
   assert.equal(new Game().adapter.features.balance, false, 'Aardwolf has no balance');
 }
 
+// Logging in again after Achaea cuts an idle connection: the identical name prompt must still be answered.
+{
+  const g = new Game();
+  const cmds: string[] = [];
+  g.attach((m: any) => { if (m.t === 'cmd') cmds.push(m.d); });
+  g.onSession(false, 'achaea', 'ire');
+  const login = async () => {
+    g.signIn('Finch', 'fake-test-pass');
+    g.onMessage({ t: 'status', connected: false, msg: 'Connecting to achaea.com:23…' });
+    g.onMessage({ t: 'status', connected: true });
+    g.onMessage({ t: 'text', d: "\r\n\x1b[32m3.\x1b[37m Quit.\r\n\r\nEnter an option or enter your character's name. " });
+    g.onMessage({ t: 'prompt' });
+    g.onMessage({ t: 'text', d: 'What is your password? ' });
+    g.onMessage({ t: 'echo', on: false });
+    g.onMessage({ t: 'prompt' });
+    g.onMessage({ t: 'echo', on: true });
+    g.onMessage({ t: 'gmcp', pkg: 'Char.Name', data: { name: 'Finch' } });
+    await tick();
+  };
+  await login();
+  assert.deepEqual(cmds, ['Finch', 'fake-test-pass']);
+  assert.ok(g.state.loggedIn);
+  g.onMessage({ t: 'text', d: 'This line is assumed to be inactive, and is being cut.\r\n' });
+  g.onMessage({ t: 'status', connected: false, msg: 'connection closed' });
+  assert.ok(!g.state.loggedIn);
+  await login();
+  assert.deepEqual(cmds, ['Finch', 'fake-test-pass', 'Finch', 'fake-test-pass'], 'second login answered too');
+  assert.ok(g.state.loggedIn);
+}
+
 console.log('ire tests passed');
+process.exit(0); // login and map timers would otherwise keep node alive
