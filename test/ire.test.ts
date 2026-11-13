@@ -4,6 +4,7 @@ import { plain } from '../web/src/lib/ansi.ts';
 import { adapterFor } from '../web/src/lib/games/index.ts';
 import { gridPath, key, parseAsciiMap } from '../web/src/lib/asciiMap.ts';
 import { roomMark } from '../web/src/lib/mapStyle.ts';
+import { groupTasks } from '../web/src/lib/tasks.ts';
 
 const tick = (ms = 0) => new Promise((r) => setTimeout(r, ms));
 function setup() {
@@ -213,6 +214,31 @@ function setup() {
   room(3); await tick(700);
   assert.deepEqual(sent.slice(3), ['west']);
   g.stopWalk();
+}
+
+// Tasks: turned on and asked for at login; list, update and completed come in by GMCP.
+{
+  const g = new Game();
+  const sent: any[] = [];
+  g.attach((m: any) => { if (m.t === 'gmcp') sent.push(m); });
+  g.onSession(false, 'achaea', 'ire');
+  g.onMessage({ t: 'status', connected: true });
+  g.adapter.afterLogin(g);
+  assert.deepEqual(sent.find((m) => m.pkg === 'Core.Supports.Add')?.data, ['IRE.Tasks 1']);
+  assert.ok(sent.some((m) => m.pkg === 'IRE.Tasks.Request'));
+  g.onMessage({ t: 'gmcp', pkg: 'IRE.Tasks.List', data: [
+    { id: '9', name: 'The Newbie Channel', desc: 'Ask on NEWBIE.', type: 'Task', cmd: 'TASK 9 INFO', status: '0', group: 'Getting Help' },
+    { id: '14', name: "Head to the Chieftain's Hut", desc: 'Go north.', type: 'Task', cmd: 'TASK 14 INFO', status: '0', group: 'Active' },
+  ] });
+  assert.equal(g.state.tasks.list.length, 2);
+  assert.deepEqual(groupTasks(g.state.tasks.list).map((x) => x.group), ['Active', 'Getting Help'], 'active first');
+  g.onMessage({ t: 'gmcp', pkg: 'IRE.Tasks.Update', data: { id: '9', status: '1' } });
+  const nine = g.state.tasks.list.find((t) => t.id === '9')!;
+  assert.ok(nine.done);
+  assert.equal(nine.name, 'The Newbie Channel', 'a partial update keeps the rest');
+  g.onMessage({ t: 'gmcp', pkg: 'IRE.Tasks.Completed', data: [{ id: '14' }] });
+  assert.ok(g.state.tasks.list.every((t) => t.done));
+  assert.equal(adapterFor('aardwolf').features.tasks, false);
 }
 
 // Shops come from Room.Info details: Achaea's ASCII map doesn't mark them.

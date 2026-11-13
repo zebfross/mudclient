@@ -17,6 +17,7 @@ export interface Features {
   coords: boolean;       // continent x,y on the map
   diagonals: boolean;    // ne/nw/se/sw exits: compass corners
   balance: boolean;      // Iron Realms balance / equilibrium in the header
+  tasks: boolean;        // Iron Realms tasks tab
   movesLabel: string;    // third vitals bar: "MV" (moves) or "EP" (endurance)
 }
 

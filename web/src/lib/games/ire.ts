@@ -2,6 +2,7 @@
 import { AnsiParser } from '../ansi.ts';
 import type { RoomInfo } from '../mapper.ts';
 import { mapNums, num, trimBlankLines } from './util.ts';
+import { mergeTasks, taskList } from '../tasks.ts';
 import type { GameAdapter } from './types.ts';
 
 const DIR_SHORT: Record<string, string> = {
@@ -11,22 +12,31 @@ const DIR_SHORT: Record<string, string> = {
 // "--- Area 430: The Pygmy Dungeons - v41111 ---" … "--- A dark, dank cell ------ 0:0:0 ---"
 const MAP_START = /^\s*--- Area \d+: .* ---\s*$/;
 const PROMPT_RE = /^\s*\d+h, \d+m(?:, \d+[a-z])*\s+([a-z@]*)-/;
+/** Tasks aren't in the relay's start-up list: turn them on, then ask. */
+function askTasks(host: { gmcp(pkg: string, data?: unknown): void }) {
+  host.gmcp('Core.Supports.Add', ['IRE.Tasks 1']);
+  host.gmcp('IRE.Tasks.Request');
+}
 const MAP_END = /^\s*--- .* -?\d+:-?\d+:-?\d+ ---\s*$/;
 
 export const ire: GameAdapter = {
   family: 'ire',
   features: {
     hungerThirst: false, notes: false, objectives: false, shops: false, lasertag: false,
-    gameClock: false, coords: false, diagonals: true, balance: true, movesLabel: 'EP',
+    gameClock: false, coords: false, diagonals: true, balance: true, tasks: true, movesLabel: 'EP',
   },
   quickCommands: ['look', 'score', 'inventory', 'qw', 'map', 'help'],
 
   namePrompt: /enter your character'?s name\.?\s*$/i,
   isLoginSignal: (pkg) => pkg === 'char.vitals' || pkg === 'char.name' || pkg === 'char.status' || pkg.startsWith('char.items.'),
   // Only answered in the game, so the reply logs us in.
-  onResume: (host) => host.gmcp('Char.Items.Inv'),
+  onResume(host) {
+    host.gmcp('Char.Items.Inv');
+    askTasks(host);
+  },
   afterLogin(host) {
     host.gmcp('Char.Items.Inv');
+    askTasks(host);
     host.gmcp('Comm.Channel.Players');
     host.refreshMap(800);
   },
@@ -67,6 +77,10 @@ export const ire: GameAdapter = {
         exits: mapNums(data.exits ?? {}),
       };
       host.enterRoom(room);
+    } else if (p === 'ire.tasks.list') {
+      host.set({ tasks: { list: taskList(data), at: Date.now(), loading: false } });
+    } else if (p === 'ire.tasks.update' || p === 'ire.tasks.completed') {
+      host.set({ tasks: { ...host.state.tasks, list: mergeTasks(host.state.tasks.list, data, p === 'ire.tasks.completed'), at: Date.now() } });
     } else if (p === 'comm.channel.text') {
       host.addChat({ chan: String(data.channel ?? ''), player: String(data.talker ?? ''), msg: new AnsiParser().parse(String(data.text ?? '')) });
     }

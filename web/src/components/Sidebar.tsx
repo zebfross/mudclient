@@ -5,6 +5,7 @@ import { Curios, Souls } from './Room.tsx';
 import { Group, Satchel } from './Panels.tsx';
 import { Dispatches } from './Dispatches.tsx';
 import { Objectives } from './Objectives.tsx';
+import { TasksPanel } from './Tasks.tsx';
 import { Notes, usePersonalUnread } from './Notes.tsx';
 import { LasertagPanel, useInArena } from './Lasertag.tsx';
 import { questActive } from '../lib/objectives.ts';
@@ -12,13 +13,14 @@ import { Icon } from './ui.tsx';
 import { adapterFor, type Features } from '../lib/games/index.ts';
 
 // Tabs that only make sense in games with the matching feature.
-const TAB_FEATURE: Partial<Record<TabId, keyof Features>> = { goals: 'objectives', notes: 'notes', laser: 'lasertag' };
+const TAB_FEATURE: Partial<Record<TabId, keyof Features>> = { goals: 'objectives', tasks: 'tasks', notes: 'notes', laser: 'lasertag' };
 
-type TabId = 'objects' | 'satchel' | 'goals' | 'souls' | 'chat' | 'notes' | 'laser';
+type TabId = 'objects' | 'satchel' | 'goals' | 'tasks' | 'souls' | 'chat' | 'notes' | 'laser';
 const TABS: { id: TabId; icon: string; label: string }[] = [
   { id: 'objects', icon: 'category', label: 'Curios & Objects' },
   { id: 'satchel', icon: 'work', label: 'Satchel' },
   { id: 'goals', icon: 'flag', label: 'Objectives' },
+  { id: 'tasks', icon: 'task_alt', label: 'Tasks' },
   { id: 'souls', icon: 'group', label: 'Souls Present' },
   { id: 'chat', icon: 'forum', label: 'Dispatches' },
   { id: 'notes', icon: 'mail', label: 'Notes' },
@@ -36,7 +38,7 @@ function loadTab(): TabId {
 
 /** Map pinned on top, icon-tabbed panels below. */
 export function Sidebar({ className = '' }: { className?: string }) {
-  const { chat, roomObjs, roomChars, inventory, objectives, lasertag, mud } = useGame();
+  const { chat, roomObjs, roomChars, inventory, objectives, lasertag, mud, tasks } = useGame();
   const features = adapterFor(mud.family).features;
   const tabs = TABS.filter((t) => !TAB_FEATURE[t.id] || features[TAB_FEATURE[t.id]!]);
   const inArena = useInArena();
@@ -58,6 +60,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     objects: roomObjs.length,
     satchel: inventory.filter((i) => i.wearLoc === -1).length,
     goals: objectives.goals.length + (questActive(objectives.quest) ? 1 : 0) + (objectives.campaign?.active ? 1 : 0),
+    tasks: tasks.list.filter((t) => !t.done && t.group === 'Active').length,
     souls: roomChars.length,
     chat: unread.length,
     notes: notesUnread,
@@ -69,6 +72,7 @@ export function Sidebar({ className = '' }: { className?: string }) {
     objects: <Curios bare />,
     satchel: <Satchel bare />,
     goals: <Objectives />,
+    tasks: <TasksPanel />,
     souls: <div className="flex flex-col gap-4"><Souls bare /><Group /></div>,
     chat: <Dispatches bare className="h-full" />,
     notes: <Notes />,

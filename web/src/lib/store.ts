@@ -10,6 +10,7 @@ export { extractMap } from './games/util.ts';
 import { Mapper, type RoomInfo, type SeenCell } from './mapper.ts';
 import { key, labelGrid, parseAsciiMap } from './asciiMap.ts';
 import { LASTING } from './mapStyle.ts';
+import { emptyTasks, type Tasks } from './tasks.ts';
 import { DETAIL_TYPES, parseInvDetails, type ItemDetails } from './items.ts';
 import { SUN_EVENTS, emptyClock, parseTimeLine, type GameClock } from './gameTime.ts';
 import { parseBoards, parseNote, parseNoteList, type Board, type Note, type Post } from './notes.ts';
@@ -153,6 +154,8 @@ export interface State {
   /** In Aardwolf's note editor: whatever you type becomes part of the note. */
   noteEditor: boolean;
   lasertag: Lasertag;
+  /** Iron Realms tasks (IRE.Tasks). */
+  tasks: Tasks;
 }
 
 const MAX_LINES = 3000;
@@ -190,7 +193,7 @@ export class Game implements Host {
     mud: { game: currentGame.id, family: currentGame.family },
     connected: false, status: 'Not connected', localEcho: true, loggedIn: false, login: { stage: 'idle' }, sessionAt: 0, manualDisconnect: false,
     lines: [], partial: [], char: {}, roomDesc: [], roomChars: [], roomObjs: [],
-    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, shopAsking: false, noteEditor: false, lasertag: emptyLasertag(),
+    inventory: [], inventoryAt: 0, equipment: [], itemDetails: loadItemDetails(), chat: loadChat(), tagsListing: [], mapVersion: 0, objectives: emptyObjectives(), notes: emptyNotes(), clock: emptyClock(), asciiMap: [], death: null, shop: null, shopAsking: false, noteEditor: false, lasertag: emptyLasertag(), tasks: emptyTasks(),
   };
   mapper = new Mapper();
   private listeners = new Set<() => void>();
@@ -489,6 +492,13 @@ export class Game implements Host {
   }
 
   gmcp(pkg: string, data?: unknown) { this.sendRaw({ t: 'gmcp', pkg, data }); }
+  /** Ask an Iron Realms game for the task list again. */
+  refreshTasks() {
+    if (!this.state.loggedIn || !this.adapter.features.tasks) return;
+    this.set({ tasks: { ...this.state.tasks, loading: true } });
+    this.gmcp('IRE.Tasks.Request');
+    setTimeout(() => { if (this.state.tasks.loading) this.set({ tasks: { ...this.state.tasks, loading: false } }); }, 5000);
+  }
 
   // ---- sign-in ----------------------------------------------------------------
   // The password is only held in memory until it's sent at the password prompt, then dropped.
